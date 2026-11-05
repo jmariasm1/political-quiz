@@ -1,7 +1,7 @@
 // The tier list poster keeps the meme look of the original chart in both themes: pastel tier blocks
 // on a dark board, white logo tiles. The page uses a responsive HTML version of the same grouping.
 import { fixedTier, spreadTiers } from '../core.js';
-import { T, clusterColor, el, line, logoFit, measure, partyColor, rect, subColor, svgDoc, text, wrap } from './svg.js';
+import { T, el, groupColor, groupsAt, line, logoFit, measure, partyColor, rect, svgDoc, text, wrap } from './svg.js';
 
 const BOARD = { bg: '#161616', row: '#272727', text: '#F5F5F5', text2: '#D0D0D0', text3: '#ADADAD', ink: '#121212' };
 
@@ -29,9 +29,7 @@ export function tierRange(tier, tiers, t) {
 
 /** The groups named in the key, in their tile colours. Tiles are white in both themes. */
 export function tierKey(model, lang, colorBy) {
-  return colorBy === 'sub'
-    ? model.clusters.flatMap((c) => c.children.map((s) => ({ label: s.label[lang], color: subColor(s.id, 'light') })))
-    : model.clusters.map((c) => ({ label: c.label[lang], color: clusterColor(c.id, 'light') }));
+  return groupsAt(model, colorBy).map((group) => ({ label: group.label[lang], color: groupColor(group.id, 'light') }));
 }
 
 export function tierPoster({ model, lang, t, groups, tiers, colorBy, logoUrl, flagUrl, title, subtitle, eyebrow, url, flagAspect }) {

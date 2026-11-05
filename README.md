@@ -8,7 +8,7 @@ What a visitor gets:
 
 - A five-dimensional profile (economics, social values, civil liberties, internationalism, climate).
 - A tier list of every party, from S to F, with fixed cutoffs or tiers spread to be as even as possible.
-- A PCA map with the visitor as a point, plus charts that explain what the axes mean. The map and the tier list can both colour parties by cluster or by subgroup.
+- A PCA map with the visitor as a point, plus charts that explain what the axes mean. The map and the tier list can colour parties by cluster, subgroup or current.
 - A radar comparison of any two profiles, with "Where they agree and diverge".
 - Filters for the G20, G7, founding BRICS, full democracies, any grouping you add, or a single country.
 - A PNG download for every chart, and saved results when they come back.
@@ -43,9 +43,9 @@ europe,Europe,Europa,DE;FR;IT;UK
 
 It appears in the filters by itself.
 
-### Rename a cluster or subgroup
+### Rename a cluster, subgroup or current
 
-Group names are in [`data/cluster_labels.csv`](data/cluster_labels.csv), each with a short label, a phrase that fits inside a sentence ("You sit closest to the green left") and a one-line description, in both languages. Each row is tied to the group containing its `anchors` (party ids), not to a fixed number, so names keep following the right group as the data changes. If an update creates a group that no row matches, it gets an automatic name built from its scores, and the build prints a warning telling you to name it.
+Group names are in [`data/cluster_labels.csv`](data/cluster_labels.csv), each with a short label, a phrase that fits inside a sentence ("You sit closest to the progressive liberals") and a one-line description, in both languages. Each row is tied to the group containing its `anchors` (party ids), not to a fixed number, so names keep following the right group as the data changes. If an update creates a group that no row matches, it gets an automatic name built from its scores, and the build prints a warning telling you to name it.
 
 ### Change tier cutoffs or thresholds
 
@@ -101,6 +101,7 @@ If your data has a mistake, `build_model.py` stops and names the file and line.
 - **Similarity:** `100 − RMSD` across the five dimensions, equally weighted.
 - **Main clusters:** k-means, with k chosen by the highest mean silhouette on k = 2 to 12.
 - **Subgroups:** the same procedure inside each main cluster, with no number imposed. Solutions containing a one-party group are rejected, and a cluster stays whole if its best silhouette is under 0.25.
+- **Currents:** the same procedure and rules again, inside each subgroup.
 - **Checks shown beside the groups, never used to choose them:** a reference test against structureless data, and bootstrap stability (Hennig's cluster-wise Jaccard).
 - **PCA:** fitted once on the parties, only to draw the map. A fixed sign rule stops the axes flipping when data changes.
 

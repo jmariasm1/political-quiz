@@ -1,4 +1,4 @@
-import { componentPoles, mapFidelity, project, rmsd } from '../core.js';
+import { componentPoles, finestGroupOf, mapFidelity, nearestGroup, project, rmsd } from '../core.js';
 import { circlePanel, loadingsPanel, variancePanel, youPanel } from '../charts/interpret.js';
 import { heatTable } from '../charts/misc.js';
 import { mapGroups, pcaChart, pcaLegendSvg } from '../charts/pca.js';
@@ -64,10 +64,7 @@ export function mountMapFigure(host, app, { you = null, past = [], hero = false,
     }
     return best ? model.parties.find((q) => q.id === best.id) : null;
   };
-  const groupName = (p) => {
-    const main = model.clusters.find((c) => c.id === p.cluster);
-    return (main.children.find((c) => c.id === p.sub) ?? main).label[lang];
-  };
+  const groupName = (p) => finestGroupOf(p, model).label[lang];
   const tipFor = (p) => `
     <div class="tip-row">
       ${partyLogo(p, 'logo logo-tip')}
@@ -119,18 +116,16 @@ export function mapSection(root, app, { params = {}, you = null, story = false }
   let selected = params.party && model.parties.some((p) => p.id === params.party) ? params.party : null;
 
   const lc = (s) => s.charAt(0).toLowerCase() + s.slice(1);
-  const clusterNote = (c) => {
-    const d = model.diagnostics.sub[c.id];
-    if (d.selected_k <= 1) return t('map.whole', { name: c.label[lang] });
-    const vars = { name: c.label[lang], k: d.selected_k, s: t.num(d.silhouette, 2), p: t.num(d.reference.p_value, 3) };
-    return d.reference.p_value <= 0.05 ? t('map.strong', vars) : t('map.weak', vars);
+  const splitNote = (group, d, level) => {
+    if (d.selected_k <= 1) return t(`map.whole${level}`, { name: group.label[lang] });
+    const vars = { name: group.label[lang], k: d.selected_k, s: t.num(d.silhouette, 2), p: t.num(d.reference.p_value, 3) };
+    return t(`${d.reference.p_value <= 0.05 ? 'map.strong' : 'map.weak'}${level}`, vars);
   };
   const legend = () => {
-    const bySub = app.colorBy === 'sub';
     return `<ul class="key">${mapGroups(model, app.colorBy)
       .map((group) => `
       <li><button type="button" class="key-btn" data-hl="${esc(group.id)}" title="${esc(group.blurb[lang])}">
-        ${groupIcon(group.id, bySub && Boolean(group.parent), 14)}<span>${esc(group.label[lang])}</span><small>${group.n}</small>
+        ${groupIcon(group.id, Boolean(group.parent), 14)}<span>${esc(group.label[lang])}</span><small>${group.n}</small>
       </button></li>`)
       .join('')}</ul>`;
   };
@@ -146,7 +141,7 @@ export function mapSection(root, app, { params = {}, you = null, story = false }
       .map((p) => `<tr>
         <td><b>${esc(p.label)}</b><span class="party-full">${esc(p.name[lang])}</span></td>
         <td>${esc(countryName(p.country, app))}</td>
-        <td>${esc(p.sub ?? p.cluster)}</td>
+        <td>${esc(p.leaf ?? p.sub ?? p.cluster)}</td>
         <td class="num">${esc(t.num(p.pc[0], 1))}</td>
         <td class="num">${esc(t.num(p.pc[1], 1))}</td>
         ${you ? `<td class="num">${esc(t.num(100 - rmsd(you.scores, p.scores), 2))}</td>` : ''}
@@ -154,7 +149,7 @@ export function mapSection(root, app, { params = {}, you = null, story = false }
       .join('');
   };
 
-  const nearestPhrase = you ? (you.assign.sub ?? you.assign.main).phrase[lang] : '';
+  const nearestPhrase = you ? nearestGroup(you.assign).phrase[lang] : '';
   const largestSub = model.clusters.flatMap((c) => c.children).reduce((a, b) => (b.n > a.n ? b : a), { n: 0 });
   const headTag = story ? 'h2' : 'h2';
 
@@ -181,12 +176,13 @@ export function mapSection(root, app, { params = {}, you = null, story = false }
     ${howTo(t, `
       <p>${esc(t('map.how'))}</p>
       ${you ? `<p>${esc(fidelityText())}</p>` : ''}
-      ${model.clusters.map((c) => `<p>${esc(clusterNote(c))}</p>`).join('')}
+      ${model.clusters.map((c) => `<p>${esc(splitNote(c, model.diagnostics.sub[c.id], ''))}</p>`).join('')}
+      ${model.clusters.flatMap((c) => c.children).map((s) => `<p>${esc(splitNote(s, model.diagnostics.leaf[s.id], 'Leaf'))}</p>`).join('')}
       <p>${esc(t('interp.right', { pos: poles[0].positive, neg: poles[0].negative }))} ${esc(t('interp.up', { pos: poles[1].positive, neg: poles[1].negative }))}</p>
       <details class="nested">
         <summary>${esc(t('map.tableTitle'))}</summary>
         <div class="table-scroll"><table>
-          <thead><tr><th scope="col">${esc(t('common.party'))}</th><th scope="col">${esc(t('common.country'))}</th><th scope="col">${esc(t('common.subgroup'))}</th><th scope="col" class="num">${esc(t('common.pc', { n: 1 }))}</th><th scope="col" class="num">${esc(t('common.pc', { n: 2 }))}</th>${you ? `<th scope="col" class="num">${esc(t('common.similarity'))}</th>` : ''}</tr></thead>
+          <thead><tr><th scope="col">${esc(t('common.party'))}</th><th scope="col">${esc(t('common.country'))}</th><th scope="col">${esc(t('common.group'))}</th><th scope="col" class="num">${esc(t('common.pc', { n: 1 }))}</th><th scope="col" class="num">${esc(t('common.pc', { n: 2 }))}</th>${you ? `<th scope="col" class="num">${esc(t('common.similarity'))}</th>` : ''}</tr></thead>
           <tbody data-map-table>${tableRows()}</tbody>
         </table></div>
       </details>`)}
@@ -261,14 +257,12 @@ export function mapSection(root, app, { params = {}, you = null, story = false }
       host.innerHTML = '';
       return;
     }
-    const main = model.clusters.find((c) => c.id === p.cluster);
-    const sub = main.children.find((c) => c.id === p.sub);
     host.innerHTML = `
     <div class="detail" aria-live="polite">
       ${partyLogo(p, 'logo logo-small')}
       <div class="detail-body">
         <p><b>${esc(p.label)}</b> ${esc(p.name[lang])}</p>
-        <p class="meta">${flagImg(p, 'flag-inline')} ${esc(countryName(p.country, app))} · ${esc((sub ?? main).label[lang])}</p>
+        <p class="meta">${flagImg(p, 'flag-inline')} ${esc(countryName(p.country, app))} · ${esc(finestGroupOf(p, model).label[lang])}</p>
       </div>
       ${you ? `<p class="detail-score"><b>${esc(t.num(100 - rmsd(you.scores, p.scores), 2))}</b><span>${esc(t('map.closeness'))}</span></p>` : ''}
       <a class="text-link" href="#/compare?a=${you ? 'you' : model.parties[0].id}&b=${esc(p.id)}" data-compare-party="${esc(p.id)}">${esc(you ? t('common.compareWithYou') : t('common.compare'))}</a>

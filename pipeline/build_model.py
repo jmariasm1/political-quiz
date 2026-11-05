@@ -3,7 +3,7 @@
 
 Run:  python pipeline/build_model.py
 
-The model has two clustering levels, both chosen by mean silhouette with no number of
+The model has three clustering levels, all chosen by mean silhouette with no number of
 clusters imposed:
 
   1. Main clusters: k-means on all parties, k chosen on the grid 2..k_max.
@@ -11,6 +11,7 @@ clusters imposed:
      with a one-party group are rejected, and a cluster stays whole when its best
      silhouette is under `min_split_silhouette` (0.25, the conventional line below which
      Kaufman and Rousseeuw describe no substantial structure).
+  3. Currents: the same procedure and rules again, inside each subgroup.
 
 Two further checks are reported but never used to choose k, so the silhouette stays the
 only selection rule:
@@ -18,7 +19,7 @@ only selection rule:
   - Reference test: how often structureless data (uniform in the cluster's rotated
     bounding box) reaches the observed best silhouette. A high value means the subgroups
     may be slices of a continuum.
-  - Bootstrap stability: Hennig's cluster-wise Jaccard, one value per subgroup.
+  - Bootstrap stability: Hennig's cluster-wise Jaccard, one value per subgroup or current.
 
 PCA is fitted once on all parties and only ever draws the map. It never assigns anyone.
 """
@@ -218,42 +219,62 @@ def build(inputs: dict) -> tuple[dict, list[str]]:
     main_labels = np.array([main_of[int(v)] for v in top_model.labels_])
     top_sil = silhouette_samples(X, main_labels)
 
-    clusters, sub_diagnostics = [], {}
-    sub_labels = np.empty(len(X), dtype=object)
-    sub_sil = np.zeros(len(X))
-    for m in range(top_best['k']):
-        cid = f'C{m + 1}'
-        idx = np.where(main_labels == m)[0]
-        Y = X[idx]
-        grid = silhouette_grid(Y, k_max, seed, 100, min_size) if len(idx) >= params['min_parent_size'] else []
+    def split_group(Y):
+        """One step down the hierarchy: the silhouette rule applied to one group's parties."""
+        grid = silhouette_grid(Y, k_max, seed, 100, min_size) if len(Y) >= params['min_parent_size'] else []
         best = best_of(grid)
         split = best is not None and best['silhouette'] >= params['min_split_silhouette']
-        children = []
         diag = dict(grid=[dict(k=g['k'], silhouette=r(g['silhouette'], 4), sizes=g['sizes'],
                                eligible=g['eligible']) for g in grid],
                     selected_k=best['k'] if split else 1)
-        if split:
-            model = fit_kmeans(Y, best['k'], seed, 200)
-            order = np.argsort(-project(model.cluster_centers_)[:, 0])
-            remap = {int(old): new for new, old in enumerate(order)}
-            local = np.array([remap[int(v)] for v in model.labels_])
-            sub_sil[idx] = silhouette_samples(Y, local)
-            jaccard = bootstrap_jaccard(Y, local, params['bootstrap_draws'], seed)
-            diag['reference'] = {key: (r(val, 4) if isinstance(val, float) else val) for key, val in
-                                 reference_test(Y, best['silhouette'], k_max, params['reference_draws'], seed).items()}
-            diag['silhouette'] = r(best['silhouette'], 4)
-            for s in range(best['k']):
-                letter = string.ascii_lowercase[s]
-                sid = f'{cid}{letter}'
+        if not split:
+            return diag, None, None, None
+        model = fit_kmeans(Y, best['k'], seed, 200)
+        # Stable ids: within a group, the first child is the one furthest along PC1.
+        order = np.argsort(-project(model.cluster_centers_)[:, 0])
+        remap = {int(old): new for new, old in enumerate(order)}
+        local = np.array([remap[int(v)] for v in model.labels_])
+        jaccard = bootstrap_jaccard(Y, local, params['bootstrap_draws'], seed)
+        diag['reference'] = {key: (r(val, 4) if isinstance(val, float) else val) for key, val in
+                             reference_test(Y, best['silhouette'], k_max, params['reference_draws'], seed).items()}
+        diag['silhouette'] = r(best['silhouette'], 4)
+        return diag, local, silhouette_samples(Y, local), jaccard
+
+    def group_record(gid, mem, level, stability, **extra):
+        centroid = X[mem].mean(0)
+        info = resolve_label({ids[i] for i in mem}, level, inputs['labels'], centroid, overall, cfg, gid, warnings)
+        return dict(id=gid, n=len(mem), centroid=r(centroid, 2), pc=r(project(centroid)[:2]),
+                    members=[ids[i] for i in mem], stability=stability, **extra, **info)
+
+    clusters, sub_diagnostics, leaf_diagnostics = [], {}, {}
+    sub_labels = np.empty(len(X), dtype=object)
+    leaf_labels = np.empty(len(X), dtype=object)
+    sub_sil = np.zeros(len(X))
+    leaf_sil = np.zeros(len(X))
+    for m in range(top_best['k']):
+        cid = f'C{m + 1}'
+        idx = np.where(main_labels == m)[0]
+        diag, local, samples, jaccard = split_group(X[idx])
+        children = []
+        if local is not None:
+            sub_sil[idx] = samples
+            for s in range(diag['selected_k']):
+                sid = f'{cid}{string.ascii_lowercase[s]}'
                 mem = idx[local == s]
                 sub_labels[mem] = sid
-                centroid = Y[local == s].mean(0)
-                info = resolve_label({ids[i] for i in mem}, 'sub', inputs['labels'], centroid, overall, cfg, sid, warnings)
-                children.append(dict(id=sid, parent=cid, n=len(mem), centroid=r(centroid, 2), pc=r(project(centroid)[:2]),
-                                     members=[ids[i] for i in mem], silhouette=r(sub_sil[mem].mean()),
-                                     stability=r(jaccard[s]), **info))
-        else:
-            sub_labels[idx] = None
+                leaf_diag, leaf_local, leaf_samples, leaf_jaccard = split_group(X[mem])
+                leaf_diagnostics[sid] = leaf_diag
+                currents = []
+                if leaf_local is not None:
+                    leaf_sil[mem] = leaf_samples
+                    for q in range(leaf_diag['selected_k']):
+                        lid = f'{sid}{q + 1}'
+                        leaf_mem = mem[leaf_local == q]
+                        leaf_labels[leaf_mem] = lid
+                        currents.append(group_record(lid, leaf_mem, 'leaf', r(leaf_jaccard[q]), parent=sid,
+                                                     silhouette=r(leaf_sil[leaf_mem].mean())))
+                children.append(group_record(sid, mem, 'sub', r(jaccard[s]), parent=cid,
+                                             silhouette=r(sub_sil[mem].mean()), children=currents))
         centroid = X[idx].mean(0)
         info = resolve_label({ids[i] for i in idx}, 'main', inputs['labels'], centroid, overall, cfg, cid, warnings)
         clusters.append(dict(id=cid, n=len(idx), centroid=r(centroid, 2), pc=r(project(centroid)[:2]),
@@ -261,9 +282,12 @@ def build(inputs: dict) -> tuple[dict, list[str]]:
                              children=children, **info))
         sub_diagnostics[cid] = diag
 
-    leaves = [sub_labels[i] or f'C{main_labels[i] + 1}' for i in range(len(X))]
-    leaf_ids = {leaf: n for n, leaf in enumerate(sorted(set(leaves)))}
-    leaf_sil = float(silhouette_score(X, [leaf_ids[leaf] for leaf in leaves])) if len(leaf_ids) > 1 else None
+    def overall_silhouette(labels):
+        return float(silhouette_score(X, labels)) if len(set(labels)) > 1 else None
+
+    main_names = [f'C{v + 1}' for v in main_labels]
+    sub_overall = overall_silhouette([sub_labels[i] or main_names[i] for i in range(len(X))])
+    leaf_overall = overall_silhouette([leaf_labels[i] or sub_labels[i] or main_names[i] for i in range(len(X))])
 
     # A short hash of the inputs. Saved results remember it so the site can say when the
     # party data have changed since a result was taken.
@@ -294,8 +318,8 @@ def build(inputs: dict) -> tuple[dict, list[str]]:
                       flag=p['flag'] or next(c['flag'] for c in inputs['countries'] if c['code'] == p['country_code']),
                       abbrev=p['abbrev'], name=dict(en=p['name_en'], es=p['name_es']),
                       scores=[float(p[d]) for d in DIMS], pc=r(pcs[i][:2]),
-                      cluster=f'C{main_labels[i] + 1}', sub=sub_labels[i],
-                      silhouette=r(top_sil[i]), subSilhouette=r(sub_sil[i]),
+                      cluster=f'C{main_labels[i] + 1}', sub=sub_labels[i], leaf=leaf_labels[i],
+                      silhouette=r(top_sil[i]), subSilhouette=r(sub_sil[i]), leafSilhouette=r(leaf_sil[i]),
                       logo=p['logo'] if p['logo'] and (SITE / 'assets' / 'logos' / p['logo']).is_file() else None,
                       logoAspect=logo_aspect(p['logo']), logoSource=p['logo_source']) for i, p in enumerate(parties)],
         clusters=clusters,
@@ -305,7 +329,9 @@ def build(inputs: dict) -> tuple[dict, list[str]]:
         diagnostics=dict(top=dict(grid=[dict(k=g['k'], silhouette=r(g['silhouette'], 4), sizes=g['sizes'])
                                         for g in top_grid], selected_k=top_best['k'],
                                   silhouette=r(top_best['silhouette'], 4)),
-                         sub=sub_diagnostics, leaf_silhouette=r(leaf_sil, 4) if leaf_sil is not None else None,
+                         sub=sub_diagnostics, leaf=leaf_diagnostics,
+                         sub_overall=r(sub_overall, 4) if sub_overall is not None else None,
+                         leaf_overall=r(leaf_overall, 4) if leaf_overall is not None else None,
                          params={k: v for k, v in params.items()}),
     )
     for p in parties:
@@ -394,8 +420,14 @@ def main() -> int:
               f"silhouette {d.get('silhouette')}, reference p={ref.get('p_value')}")
         for s in c['children']:
             flag = '  [AUTO LABEL]' if s['auto'] else ''
+            ld = model['diagnostics']['leaf'][s['id']]
             print(f"    {s['id']} {s['label']['en']} (n={s['n']}), stability {s['stability']}{flag}: "
-                  f"{' '.join(s['members'])}")
+                  f"k={ld['selected_k']}, silhouette {ld.get('silhouette')}, "
+                  f"reference p={ld.get('reference', {}).get('p_value')}")
+            for leaf in s['children']:
+                leaf_flag = '  [AUTO LABEL]' if leaf['auto'] else ''
+                print(f"      {leaf['id']} {leaf['label']['en']} (n={leaf['n']}), stability {leaf['stability']}{leaf_flag}: "
+                      f"{' '.join(leaf['members'])}")
     for w in warnings:
         print(f'  WARNING {w}')
     return 0

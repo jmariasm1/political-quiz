@@ -1,4 +1,4 @@
-import { agreement, similarity } from '../core.js';
+import { agreement, allGroups, similarity } from '../core.js';
 import { radarChart } from '../charts/misc.js';
 import { T, el, esc, g, line, measure, poster, rect, svgDoc, text, wrap } from '../charts/svg.js';
 import { countryName, howTo, mountChart, pngButton, wirePng } from '../ui.js';
@@ -10,7 +10,7 @@ export function compareSection(root, app, { params = {}, story = false } = {}) {
   const results = store.results();
   const activeResult = store.active();
   const you = activeResult ? app.derive(activeResult) : null;
-  const clusters = model.clusters.flatMap((c) => [c, ...c.children]);
+  const clusters = allGroups(model);
 
   // One lookup for everything that can fill a profile slot.
   const resolve = (id) => {

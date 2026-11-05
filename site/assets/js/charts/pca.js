@@ -1,6 +1,6 @@
-// The party map: the 2D PCA projection, drawn with either main clusters or subgroups, plus the person.
+// The party map: the 2D PCA projection, drawn with main clusters, subgroups or currents, plus the person.
 import { componentPoles, convexHull, project } from '../core.js';
-import { T, clusterColor, el, g, line, markerPath, measure, partyColor, shapeOf, subColor, text, wrap } from './svg.js';
+import { T, clusterColor, el, g, groupColor, groupsAt, line, markerPath, measure, partyColor, partyGroupId, shapeOf, text, wrap } from './svg.js';
 
 /** Equal scale on both axes, so the map doesn't distort distances between parties. */
 function layout(model, extras, width, m, minAspect) {
@@ -83,14 +83,11 @@ function placeLabels(items, obstacles, bounds, fontSize) {
 
 /** The groups the current view draws. */
 export function mapGroups(model, colorBy) {
-  if (colorBy !== 'sub') {
-    return model.clusters.map((c) => ({ ...c, color: clusterColor(c.id), parties: model.parties.filter((p) => p.cluster === c.id) }));
-  }
-  return model.clusters.flatMap((c) =>
-    c.children.length
-      ? c.children.map((s) => ({ ...s, color: subColor(s.id), parties: model.parties.filter((p) => p.sub === s.id) }))
-      : [{ ...c, color: clusterColor(c.id), parties: model.parties.filter((p) => p.cluster === c.id) }],
-  );
+  return groupsAt(model, colorBy).map((group) => ({
+    ...group,
+    color: groupColor(group.id),
+    parties: model.parties.filter((p) => partyGroupId(p, colorBy) === group.id),
+  }));
 }
 
 /**
@@ -98,7 +95,7 @@ export function mapGroups(model, colorBy) {
  *                    so axes, groups and outlines never move when the filter changes.
  * @param o.you       { scores, label, closest: [party ids] } or null
  * @param o.past      earlier positions of the same person, drawn as hollow marks
- * @param o.colorBy   'cluster' or 'sub'
+ * @param o.colorBy   'cluster', 'sub' or 'leaf'
  * @param o.allLabels true when the map is drawn wide enough to try to label every party
  * @param o.mode      'screen' or 'export'
  */
@@ -114,7 +111,7 @@ export function pcaChart(o) {
   const fontSize = big ? 15.5 : compact ? 11 : 11.5;
   const plot = { x0: m.l, x1: width - m.r, y0: m.t, y1: m.t + L.plotH };
   const closest = you?.closest ?? [];
-  const bySub = colorBy === 'sub';
+  const bySub = colorBy === 'sub' || colorBy === 'leaf';
   let body = '';
 
   // Grid
@@ -178,14 +175,14 @@ export function pcaChart(o) {
     const x = px(p.pc[0]);
     const y = py(p.pc[1]);
     points.push({ id: p.id, x, y });
-    const groupId = bySub ? p.sub ?? p.cluster : p.cluster;
+    const groupId = partyGroupId(p, colorBy);
     if (!visible.has(p.id)) {
       ghosts += el('circle', { cx: x, cy: y, r: Math.max(2.2, r * 0.5), fill: T.lineStrong, 'fill-opacity': 0.55, 'data-group': groupId });
       continue;
     }
     if (closest.includes(p.id)) dots += el('circle', { cx: x, cy: y, r: r + (big ? 6 : 4), fill: 'none', stroke: T.you, 'stroke-width': big ? 2 : 1.5 });
     dots += el('path', {
-      d: markerPath(bySub ? shapeOf(p.sub) : 'circle', x, y, r), fill: partyColor(p, colorBy), stroke: T.bg, 'stroke-width': big ? 2 : 1.5,
+      d: markerPath(bySub ? shapeOf(groupId) : 'circle', x, y, r), fill: partyColor(p, colorBy), stroke: T.bg, 'stroke-width': big ? 2 : 1.5,
       'paint-order': 'stroke', 'stroke-linejoin': 'round', 'data-group': groupId, 'data-party': p.id,
     });
     reserved(x, y, r + 1.5);
@@ -241,11 +238,12 @@ export function pcaChart(o) {
     const { d, hull } = hullPath(pts, big ? (bySub ? 20 : 26) : compact ? 9 : bySub ? 15 : 19);
     const any = group.parties.some((p) => visible.has(p.id));
     hulls += el('path', { d, fill: group.color, 'fill-opacity': any ? (bySub ? 0.14 : 0.1) : 0.03, stroke: group.color, 'stroke-opacity': any ? 0.55 : 0.15, 'stroke-width': big ? 1.75 : 1.25, 'data-group': group.id });
-    if (minimal) continue;
+    // On a phone, the key below the map names each group by colour and shape.
+    if (minimal || compact) continue;
 
-    const size = big ? 17 : compact ? 9.5 : 12.5;
+    const size = big ? 17 : 12.5;
     const maxW = big ? 210 : 140;
-    const lines = compact ? [group.id] : wrap(group.label[lang], maxW, size, 700);
+    const lines = wrap(group.label[lang], maxW, size, 700);
     const lh = size * 1.14;
     const w = Math.max(...lines.map((l) => measure(l, size, 700)));
     const h = lines.length * lh;
@@ -319,7 +317,7 @@ export function pcaChart(o) {
       inner += line(item.x, item.y, tx, ty, { stroke: T.muted, 'stroke-width': big ? 1 : 0.75 });
     }
     inner += text(box.x, box.y + box.h - (big ? 3 : 2.5), item.text, { 'font-size': fontSize, 'font-weight': item.strong ? 700 : 500, fill: item.strong ? T.text : T.text2 });
-    labels += g({ 'data-group': bySub ? p.sub ?? p.cluster : p.cluster }, inner);
+    labels += g({ 'data-group': partyGroupId(p, colorBy) }, inner);
   }
 
   body += hulls + ghosts + youLines + centres + dots + labels + names + pastMarks + youMark;
@@ -336,7 +334,7 @@ export function pcaLegendSvg({ model, lang, width, colorBy, y = 0 }) {
     const color = clusterColor(c.id);
     const x = i * colW;
     let yy = y + 20;
-    if (colorBy !== 'sub') {
+    if (colorBy !== 'sub' && colorBy !== 'leaf') {
       body += el('path', { d: markerPath('circle', x + 9, yy - 6, 8), fill: color });
       body += text(x + 26, yy, `${c.label[lang]}  (${c.n})`, { 'font-size': 20, 'font-weight': 700, fill: T.text });
     } else {
@@ -344,7 +342,16 @@ export function pcaLegendSvg({ model, lang, width, colorBy, y = 0 }) {
       yy += 10;
       for (const s of c.children) {
         yy += 27;
-        body += el('path', { d: markerPath(shapeOf(s.id), x + 9, yy - 6, 7.5), fill: subColor(s.id) });
+        if (colorBy === 'leaf' && s.children.length) {
+          body += text(x, yy, `${s.label[lang]}  (${s.n})`, { 'font-size': 18, 'font-weight': 600, fill: T.text });
+          for (const leaf of s.children) {
+            yy += 26;
+            body += el('path', { d: markerPath(shapeOf(leaf.id), x + 23, yy - 6, 7), fill: groupColor(leaf.id) });
+            body += text(x + 40, yy, `${leaf.label[lang]}  (${leaf.n})`, { 'font-size': 17, fill: T.text2 });
+          }
+          continue;
+        }
+        body += el('path', { d: markerPath(shapeOf(s.id), x + 9, yy - 6, 7.5), fill: groupColor(s.id) });
         body += text(x + 26, yy, `${s.label[lang]}  (${s.n})`, { 'font-size': 18, fill: T.text2 });
       }
     }

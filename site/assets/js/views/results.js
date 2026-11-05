@@ -1,7 +1,7 @@
 // The results story: one scrolling page, from the written headline down to the full ranking.
-import { csvCell, mostDistinctive, rankingRows, rmsd, scopeParties } from '../core.js';
+import { allGroups, csvCell, mostDistinctive, nearestDistance, nearestGroup, rankingRows, rmsd, scopeParties } from '../core.js';
 import { groupKey, profileChart, rankedBars } from '../charts/misc.js';
-import { clusterColor, esc, partyColor, poster, subColor, svgDoc } from '../charts/svg.js';
+import { esc, groupColor, partyColor, poster, svgDoc } from '../charts/svg.js';
 import { saveBlob } from '../export.js';
 import {
   countryName, emptyState, flagImg, flagUrl, howTo, iconButton, mountChart, partyLogo, pngButton, scopeLabel, scopeSelect, scopeSlug,
@@ -25,7 +25,7 @@ export function resultsView(root, app, params) {
   const { assign: placed, ranked, scores } = you;
   const lang = t.lang;
   const all = store.results();
-  const group = placed.sub ?? placed.main;
+  const group = nearestGroup(placed);
   const lc = (s) => s.charAt(0).toLowerCase() + s.slice(1);
   const standout = mostDistinctive(scores, model.parties, model.dimensions);
   const isMiddle = standout.share < 0.6;
@@ -52,10 +52,7 @@ export function resultsView(root, app, params) {
     return out;
   };
   const distanceRows = () => {
-    const rows = [
-      ...model.clusters.map((c) => ({ label: c.label[lang], value: rmsd(scores, c.centroid), color: clusterColor(c.id), digits: 1 })),
-      ...model.clusters.flatMap((c) => c.children).map((c) => ({ label: c.label[lang], value: rmsd(scores, c.centroid), color: subColor(c.id), digits: 1 })),
-    ];
+    const rows = allGroups(model).map((c) => ({ label: c.label[lang], value: rmsd(scores, c.centroid), color: groupColor(c.id), digits: 1 }));
     return rows.sort((a, b) => a.value - b.value);
   };
   const scopeNote = () => (app.scope === 'all' ? '' : ` · ${scopeLabel(app.scope, model, t)}`);
@@ -138,7 +135,7 @@ export function resultsView(root, app, params) {
   <section class="sec">
     <div class="sec-head">
       <h2>${esc(t('dist.title'))}</h2>
-      <p class="takeaway">${esc(t('dist.take', { group: group.phrase[lang], d: t.num(placed.subDistance ?? placed.mainDistance, 1) }))}</p>
+      <p class="takeaway">${esc(t('dist.take', { group: group.phrase[lang], d: t.num(nearestDistance(placed), 1) }))}</p>
     </div>
     <div class="controls">${pngButton('distance', t)}</div>
     <figure class="fig fig-narrow"><div class="chart" data-chart="distance"></div></figure>
@@ -191,12 +188,12 @@ export function resultsView(root, app, params) {
         <details class="country" ${open ? 'open' : ''}>
           <summary><span>${esc(countryName(code, app))}</span><small>${esc(t('all.parties', { n: rows.length }))}</small></summary>
           <table>
-            <thead><tr><th scope="col">${esc(t('common.rank'))}</th><th scope="col">${esc(t('common.party'))}</th><th scope="col">${esc(t('common.subgroup'))}</th><th scope="col" class="num">${esc(t('common.similarity'))}</th></tr></thead>
+            <thead><tr><th scope="col">${esc(t('common.rank'))}</th><th scope="col">${esc(t('common.party'))}</th><th scope="col">${esc(t('common.group'))}</th><th scope="col" class="num">${esc(t('common.similarity'))}</th></tr></thead>
             <tbody>${rows
               .map((r, i) => `<tr>
                 <td>${i + 1}</td>
                 <td><b>${esc(r.party.abbrev)}</b><span class="party-full">${esc(r.party.name[lang])}</span></td>
-                <td><span class="tag" style="--c:${partyColor(r.party, 'sub')}">${esc(r.party.sub ?? r.party.cluster)}</span></td>
+                <td><span class="tag" style="--c:${partyColor(r.party, 'leaf')}">${esc(r.party.leaf ?? r.party.sub ?? r.party.cluster)}</span></td>
                 <td class="num">${esc(t.num(r.score, 2))}</td>
               </tr>`)
               .join('')}</tbody>
@@ -278,8 +275,8 @@ export function resultsView(root, app, params) {
       return;
     }
     if (!event.target.closest('[data-csv]')) return;
-    const head = ['Global rank', 'Rank in country', 'Country', 'Party', 'Abbreviation', 'Main cluster', 'Subgroup', 'Similarity', ...model.dimensions.map((d) => d.name[lang])];
-    const lines = [head, ...rankingRows(scores, model, lang).map((r) => [r.globalRank, r.countryRank, r.country, r.party, r.abbrev, r.cluster, r.subgroup, r.similarity.toFixed(2), ...r.scores])];
+    const head = ['Global rank', 'Rank in country', 'Country', 'Party', 'Abbreviation', 'Main cluster', 'Subgroup', 'Current', 'Similarity', ...model.dimensions.map((d) => d.name[lang])];
+    const lines = [head, ...rankingRows(scores, model, lang).map((r) => [r.globalRank, r.countryRank, r.country, r.party, r.abbrev, r.cluster, r.subgroup, r.current, r.similarity.toFixed(2), ...r.scores])];
     const csv = lines.map((row) => row.map(csvCell).join(',')).join('\r\n');
     saveBlob(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }), `compass-ranking-${lang}.csv`);
   });

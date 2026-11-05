@@ -58,10 +58,39 @@ def test_subgroup_count_is_the_silhouette_maximum():
         assert len(cluster['children']) == diag['selected_k']
 
 
+def test_currents_partition_each_subgroup_and_follow_the_same_rule():
+    parties = {p['id']: p for p in MODEL['parties']}
+    for cluster in MODEL['clusters']:
+        for sub in cluster['children']:
+            diag = MODEL['diagnostics']['leaf'][sub['id']]
+            members = [m for leaf in sub['children'] for m in leaf['members']]
+            assert sorted(members) == sorted(sub['members'])
+            assert all(leaf['n'] >= 2 and leaf['parent'] == sub['id'] for leaf in sub['children'])
+            eligible = [row for row in diag['grid'] if row['eligible']]
+            assert diag['selected_k'] == max(eligible, key=lambda r: r['silhouette'])['k']
+            assert diag['silhouette'] >= MODEL['diagnostics']['params']['min_split_silhouette']
+            assert len(sub['children']) == diag['selected_k']
+            for leaf in sub['children']:
+                assert all(parties[m]['leaf'] == leaf['id'] and parties[m]['sub'] == sub['id'] for m in leaf['members'])
+
+
+def test_a_current_is_the_kmeans_solution_for_its_subgroup():
+    parties = {p['id']: p for p in MODEL['parties']}
+    params = MODEL['diagnostics']['params']
+    for cluster in MODEL['clusters']:
+        for sub in cluster['children']:
+            Y = np.array([parties[m]['scores'] for m in sub['members']])
+            model = bm.fit_kmeans(Y, len(sub['children']), params['seed'], 200)
+            found = {frozenset(np.array(sub['members'])[model.labels_ == k].tolist()) for k in range(len(sub['children']))}
+            assert found == {frozenset(leaf['members']) for leaf in sub['children']}
+
+
 def test_every_published_group_has_a_reviewed_label():
     for cluster in MODEL['clusters']:
         assert not cluster['auto']
-        assert not any(child['auto'] for child in cluster['children'])
+        for child in cluster['children']:
+            assert not child['auto']
+            assert not any(leaf['auto'] for leaf in child['children'])
 
 
 def test_repeated_abbreviations_get_a_country_on_their_label():
@@ -121,7 +150,7 @@ def test_new_grouping_reaches_the_model():
 
 def test_a_group_nobody_labelled_gets_an_automatic_name_and_a_warning():
     inputs = fresh_inputs()
-    inputs['labels'] = [r for r in inputs['labels'] if r['label_en'] != 'Market liberal']
+    inputs['labels'] = [r for r in inputs['labels'] if r['label_en'] != 'Liberal internationalist']
     inputs['config']['clustering'].update(reference_draws=5, bootstrap_draws=5)
     model, warnings = bm.build(inputs)
     unnamed = [c for m in model['clusters'] for c in m['children'] if c['auto']]
@@ -162,11 +191,12 @@ def independent_expected(answers):
     sim = {p['id']: float(100 - np.sqrt(((u - np.array(p['scores'])) ** 2).mean())) for p in MODEL['parties']}
     main = min(MODEL['clusters'], key=lambda c: ((u - np.array(c['centroid'])) ** 2).sum())
     sub = min(main['children'], key=lambda c: ((u - np.array(c['centroid'])) ** 2).sum()) if main['children'] else None
+    leaf = min(sub['children'], key=lambda c: ((u - np.array(c['centroid'])) ** 2).sum()) if sub and sub['children'] else None
     mean = np.array(MODEL['pca']['mean'])
     comps = np.array(MODEL['pca']['components'])
     pc = comps[:2] @ (u - mean)
     total = ((u - mean) ** 2).sum()
-    return dict(answers=answers, scores=scores, similarity=sim, main=main['id'], sub=sub['id'] if sub else None,
+    return dict(answers=answers, scores=scores, similarity=sim, main=main['id'], sub=sub['id'] if sub else None, leaf=leaf['id'] if leaf else None,
                 pc=pc.tolist(), fidelity=float((pc ** 2).sum() / total) if total else 1.0)
 
 

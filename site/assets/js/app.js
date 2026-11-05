@@ -78,7 +78,7 @@ const app = {
     this.emit('scope', this.scope);
   },
   setColorBy(colorBy) {
-    this.colorBy = colorBy === 'sub' ? 'sub' : 'cluster';
+    this.colorBy = colorBy === 'sub' || colorBy === 'leaf' ? colorBy : 'cluster';
     this.emit('color', this.colorBy);
   },
 };

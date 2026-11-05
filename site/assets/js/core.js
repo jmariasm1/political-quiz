@@ -36,7 +36,7 @@ export function mapFidelity(v, pca) {
 /** Per-dimension contribution to a principal-component coordinate; they sum to the coordinate. */
 export const contributions = (v, pca, comp) => pca.components[comp].map((w, i) => w * (v[i] - pca.mean[i]));
 
-/** Nearest main cluster, then nearest subgroup inside it. Same five-dimensional RMSD throughout. */
+/** Nearest main cluster, then nearest subgroup inside it, then nearest current inside that. Same five-dimensional RMSD throughout. */
 export function assign(v, model) {
   const mains = model.clusters
     .map((c) => ({ cluster: c, distance: rmsd(v, c.centroid) }))
@@ -45,8 +45,29 @@ export function assign(v, model) {
   const subs = main.children
     .map((c) => ({ cluster: c, distance: rmsd(v, c.centroid) }))
     .sort((x, y) => x.distance - y.distance);
-  return { main, mainDistance: mains[0].distance, sub: subs[0]?.cluster ?? null, subDistance: subs[0]?.distance ?? null, mains };
+  const leaves = (subs[0]?.cluster.children ?? [])
+    .map((c) => ({ cluster: c, distance: rmsd(v, c.centroid) }))
+    .sort((x, y) => x.distance - y.distance);
+  return {
+    main,
+    mainDistance: mains[0].distance,
+    sub: subs[0]?.cluster ?? null,
+    subDistance: subs[0]?.distance ?? null,
+    leaf: leaves[0]?.cluster ?? null,
+    leafDistance: leaves[0]?.distance ?? null,
+    mains,
+  };
 }
+
+/** The most detailed group someone was placed in. */
+export const nearestGroup = (placed) => placed.leaf ?? placed.sub ?? placed.main;
+export const nearestDistance = (placed) => placed.leafDistance ?? placed.subDistance ?? placed.mainDistance;
+
+/** Every group at every level, each parent followed by its children. */
+export const allGroups = (model) => model.clusters.flatMap((c) => [c, ...c.children.flatMap((s) => [s, ...s.children])]);
+
+/** The most detailed group a party belongs to. */
+export const finestGroupOf = (party, model) => allGroups(model).find((g) => g.id === (party.leaf ?? party.sub ?? party.cluster));
 
 /** All parties, closest first. Ties break on id so the order never flickers between renders. */
 export function rankParties(v, parties) {
@@ -193,6 +214,7 @@ export function rankingRows(v, model, lang) {
       abbrev: party.abbrev,
       cluster: party.cluster,
       subgroup: party.sub ?? '',
+      current: party.leaf ?? '',
       similarity: score,
       scores: party.scores,
     };

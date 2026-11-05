@@ -6,8 +6,8 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import {
-  agreement, assign, componentPoles, contributions, convexHull, csvCell, fixedTier, leanOf, mapFidelity, mostDistinctive, normalizeScope,
-  project, rankParties, rmsd, scopeParties, scoreAnswers, similarity, spreadTiers,
+  agreement, allGroups, assign, componentPoles, contributions, convexHull, csvCell, fixedTier, leanOf, mapFidelity, mostDistinctive, normalizeScope,
+  nearestGroup, project, rankParties, rmsd, scopeParties, scoreAnswers, similarity, spreadTiers,
 } from '../site/assets/js/core.js';
 import { STRINGS, createT } from '../site/assets/js/i18n.js';
 
@@ -49,11 +49,14 @@ test('rankings are sorted and stable', () => {
   assert.deepEqual(ranked.map((r) => r.party.id), rankParties(golden.cases[0].scores, [...model.parties].reverse()).map((r) => r.party.id));
 });
 
-test('placement matches numpy: nearest main cluster, then nearest subgroup inside it', () => {
+test('placement matches numpy: nearest main cluster, then subgroup inside it, then current inside that', () => {
   for (const c of golden.cases) {
     const a = assign(c.scores, model);
     assert.equal(a.main.id, c.main);
     assert.equal(a.sub?.id ?? null, c.sub);
+    assert.equal(a.leaf?.id ?? null, c.leaf);
+    assert.ok(a.leaf.parent === a.sub.id && a.sub.parent === a.main.id);
+    assert.equal(nearestGroup(a).id, c.leaf);
   }
 });
 
@@ -196,6 +199,14 @@ test('convex hull handles pairs, collinear points and ordinary shapes', () => {
   assert.equal(convexHull([[0, 0], [2, 0], [2, 2], [0, 2], [1, 1]]).length, 4);
 });
 
+test('every group at every level is listed once, and each party sits in one current', () => {
+  const ids = allGroups(model).map((g) => g.id);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const p of model.parties) {
+    assert.ok(p.leaf.startsWith(p.sub) && p.sub.startsWith(p.cluster), p.id);
+  }
+});
+
 test('rmsd is zero for identical profiles', () => assert.equal(rmsd([1, 2, 3], [1, 2, 3]), 0));
 
 test('CSV cells are quoted, and spreadsheet formulas are defused', () => {
@@ -211,7 +222,7 @@ test('both languages define the same strings with the same placeholders', () => 
   assert.deepEqual(keys(STRINGS.en), keys(STRINGS.es));
   const sample = {
     names: 'x', n: 2, total: 3, a: 'A', b: 'B', d: 1, v: 1, k: 1, s: 1, p: 1, id: 'C1', date: 'x', name: 'x', party: 'x', country: 'x',
-    score: 1, cluster: 'x', tier: 'S', pole: 'x', poleA: 'x', poleB: 'x', who: 'x', pos: 'x', neg: 'x', x: 1, y: 1, kmax: 12, min: 1, leaf: 1,
+    score: 1, cluster: 'x', tier: 'S', pole: 'x', poleA: 'x', poleB: 'x', who: 'x', pos: 'x', neg: 'x', x: 1, y: 1, kmax: 12, min: 1, overall: 1,
     draws: 1, boot: 1, version: 'x', parties: 1, countries: 1, scope: 'x', phrase: 'x', dim: 'x', top: 'x', topCountry: 'x', topScore: 1, far: 'x',
     farCountry: 'x', farScore: 1, group: 'x', leftRight: 'x', upDown: 'x', near: 'x',
   };
@@ -273,7 +284,11 @@ test('every party has a usable logo, flag, label and position, and every group a
   }
   for (const c of model.clusters) {
     assert.ok(c.label.en && c.label.es && c.phrase.en && c.phrase.es && !c.auto, c.id);
-    for (const s of c.children) assert.ok(s.label.en && s.label.es && s.phrase.en && s.phrase.es && !s.auto, s.id);
+    for (const s of c.children) {
+      assert.ok(s.label.en && s.label.es && s.phrase.en && s.phrase.es && !s.auto, s.id);
+      assert.equal(s.children.reduce((sum, leaf) => sum + leaf.n, 0) || s.n, s.n);
+      for (const leaf of s.children) assert.ok(leaf.label.en && leaf.label.es && leaf.phrase.en && leaf.phrase.es && leaf.blurb.en && leaf.blurb.es && !leaf.auto, leaf.id);
+    }
     assert.equal(c.children.reduce((sum, s) => sum + s.n, 0) || c.n, c.n);
   }
 });

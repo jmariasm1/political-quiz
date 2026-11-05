@@ -11,6 +11,17 @@ export function methodView(root, app) {
   const qList = (dim, sign) =>
     model.questions.filter((q) => q.dim === dim && q.sign === sign).map((q) => `Q${q.id}`).join(', ');
 
+  const checkBlock = (group, dd, level) => {
+    if (dd.selected_k <= 1) return `<p>${esc(t(`map.whole${level}`, { name: group.label[lang] }))}</p>`;
+    const vars = { name: group.label[lang], k: dd.selected_k, s: t.num(dd.silhouette, 2), p: t.num(dd.reference.p_value, 3) };
+    return `<div>
+      <p>${esc(t(`${dd.reference.p_value <= 0.05 ? 'map.strong' : 'map.weak'}${level}`, vars))}</p>
+      <ul class="stab-list">${group.children
+        .map((child) => `<li><b>${esc(child.label[lang])}</b> <span>${esc(t('map.stability', { v: t.num(child.stability, 2) }))}</span></li>`)
+        .join('')}</ul>
+    </div>`;
+  };
+
   root.innerHTML = `
   <header class="page-head">
     <h1>${esc(t('method.title'))}</h1>
@@ -29,7 +40,8 @@ export function methodView(root, app) {
 
     <h2>${esc(t('method.clustersTitle'))}</h2>
     <p>${esc(t('method.clusters', { kmax: params.k_max, k: d.top.selected_k, s: t.num(d.top.silhouette, 3) }))}</p>
-    <p>${esc(t('method.subs', { min: t.num(params.min_split_silhouette, 2), leaf: t.num(d.leaf_silhouette, 3) }))}</p>
+    <p>${esc(t('method.subs', { min: t.num(params.min_split_silhouette, 2), overall: t.num(d.sub_overall, 3) }))}</p>
+    <p>${esc(t('method.leaves', { overall: t.num(d.leaf_overall, 3) }))}</p>
     <p>${esc(t('method.checks', { draws: params.reference_draws, boot: params.bootstrap_draws }))}</p>
   </article>
 
@@ -40,19 +52,8 @@ export function methodView(root, app) {
       <figcaption class="meta">${esc(t('method.silBandNote'))} ${esc(t('method.silHollow'))}</figcaption>
     </figure>
     <div class="check-grid">
-      ${model.clusters
-        .map((c) => {
-          const dd = d.sub[c.id];
-          if (dd.selected_k <= 1) return `<p>${esc(t('map.whole', { name: c.label[lang] }))}</p>`;
-          const vars = { name: c.label[lang], k: dd.selected_k, s: t.num(dd.silhouette, 2), p: t.num(dd.reference.p_value, 3) };
-          return `<div>
-            <p>${esc(t(dd.reference.p_value <= 0.05 ? 'map.strong' : 'map.weak', vars))}</p>
-            <ul class="stab-list">${c.children
-              .map((s) => `<li><b>${esc(s.label[lang])}</b> <span>${esc(t('map.stability', { v: t.num(s.stability, 2) }))}</span></li>`)
-              .join('')}</ul>
-          </div>`;
-        })
-        .join('')}
+      ${model.clusters.map((c) => checkBlock(c, d.sub[c.id], '')).join('')}
+      ${model.clusters.flatMap((c) => c.children).map((sub) => checkBlock(sub, d.leaf[sub.id], 'Leaf')).join('')}
     </div>
   </section>
 

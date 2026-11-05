@@ -24,6 +24,8 @@ const server = http.createServer((req, res) => {
 }).listen(0);
 const base = `http://127.0.0.1:${server.address().port}`;
 const model = JSON.parse(fs.readFileSync(path.join(SITE, 'data', 'model.json'), 'utf8'));
+const subCount = model.clusters.flatMap((c) => c.children).length;
+const leafCount = model.clusters.flatMap((c) => c.children).flatMap((s) => s.children).length;
 const inGroup = (id) => model.parties.filter((p) => model.groupings.find((g) => g.id === id).countries.includes(p.country)).length;
 
 const browser = await chromium.launch();
@@ -142,14 +144,20 @@ await check('fixed cutoffs are the default, and spread tiers are 5 or 10 points 
 await check('tier tiles switch between cluster and subgroup colours', async () => {
   const colours = () => page.$$eval('#s-tiers .tile', (t) => new Set(t.map((x) => x.style.getPropertyValue('--c'))).size);
   assert.equal(await colours(), model.clusters.length);
+  await page.click('#s-tiers [data-color-by="leaf"]');
+  assert.equal(await colours(), leafCount);
+  assert.equal((await page.$$('#s-tiers .tile-key')).length, leafCount);
   await page.click('#s-tiers [data-color-by="sub"]');
-  assert.equal(await colours(), model.clusters.flatMap((c) => c.children).length);
-  assert.equal((await page.$$('#s-tiers .tile-key')).length, model.clusters.flatMap((c) => c.children).length);
+  assert.equal(await colours(), subCount);
+  assert.equal((await page.$$('#s-tiers .tile-key')).length, subCount);
 });
 
 await check('the map follows the same switch, with each subgroup in its own colour', async () => {
   const fills = () => page.$$eval('#s-map [data-party]', (n) => new Set(n.map((x) => x.getAttribute('fill'))).size);
-  assert.equal(await fills(), model.clusters.flatMap((c) => c.children).length);
+  assert.equal(await fills(), subCount);
+  await page.click('#s-map [data-color-by="leaf"]');
+  assert.equal(await fills(), leafCount);
+  assert.equal((await page.$$('#s-map .key-btn')).length, leafCount);
   await page.click('#s-map [data-color-by="cluster"]');
   assert.equal(await fills(), model.clusters.length);
   assert.equal((await page.$$('#s-map .key-btn')).length, model.clusters.length);
@@ -211,7 +219,7 @@ await check('a crowded map can open wide enough to label more parties, and go ba
   assert.ok((await width()) <= host + 1);
 });
 
-await check('map labels never overlap, wherever the person lands, in both colour views', async () => {
+await check('map labels never overlap, wherever the person lands, in all three colour views', async () => {
   const patterns = [
     Array(20).fill(3),
     model.questions.map((q) => (q.sign > 0 ? 5 : 1)),
@@ -229,7 +237,7 @@ await check('map labels never overlap, wherever the person lands, in both colour
     await labelled.goto(`${base}/en/#/map?pattern=${i}`);
     await labelled.reload();
     await labelled.waitForSelector('[data-party]');
-    for (const view of ['cluster', 'sub']) {
+    for (const view of ['cluster', 'sub', 'leaf']) {
       await labelled.click(`[data-color-by="${view}"]`);
       const clashes = await labelled.$eval('[data-chart="map"] svg', (svg) => {
         const boxes = [...svg.querySelectorAll('text')]

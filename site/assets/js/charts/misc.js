@@ -1,5 +1,5 @@
 // Profile strip plot, comparison radar, ranked bars, group table and silhouette diagnostics.
-import { T, bar, clusterColor, el, fit, inkOn, line, markerPath, measure, rect, shapeOf, subColor, text } from './svg.js';
+import { T, bar, clusterColor, el, fit, groupColor, groupsAt, inkOn, line, markerPath, measure, rect, shapeOf, text } from './svg.js';
 
 /**
  * Five dimensions as strip plots: every party is a faint dot on the line and the person is the red
@@ -132,9 +132,7 @@ export function rankedBars({ rows, width, big = false, max = 100, t, flagUrl, la
 
 /** A row of coloured dots naming the groups, for the bar-chart posters. Wraps to fit `width`. */
 export function groupKey({ model, lang, colorBy, width }) {
-  const items = colorBy === 'sub'
-    ? model.clusters.flatMap((c) => c.children.map((s) => ({ label: s.label[lang], color: subColor(s.id) })))
-    : model.clusters.map((c) => ({ label: c.label[lang], color: clusterColor(c.id) }));
+  const items = groupsAt(model, colorBy).map((group) => ({ label: group.label[lang], color: groupColor(group.id) }));
   let x = 0;
   let y = 0;
   let body = '';
@@ -163,13 +161,14 @@ export function heatColor(v) {
   return `rgb(${c.join(',')})`;
 }
 
-/** What each main cluster and subgroup looks like, on all five dimensions. */
+/** What each main cluster, subgroup and current looks like, on all five dimensions. */
 export function heatTable({ model, lang, t, width, big = false }) {
   const compact = !big && width < 620;
   const fs = big ? 18 : compact ? 11.5 : 13;
   const longest = Math.max(...model.clusters.flatMap((c) => [
     measure(`${c.label[lang]} (${c.n})`, fs + (big ? 1 : 0), 700),
     ...c.children.map((s) => measure(`${s.label[lang]} (${s.n})`, fs, 500) + (big ? 22 : 14)),
+    ...c.children.flatMap((s) => s.children).map((leaf) => measure(`${leaf.label[lang]} (${leaf.n})`, fs, 500) + (big ? 44 : 28)),
   ]));
   const labelW = compact ? Math.min(62, width * 0.2) : Math.min(longest + (big ? 40 : 30), width * 0.52);
   const cols = model.dimensions.length;
@@ -186,9 +185,10 @@ export function heatTable({ model, lang, t, width, big = false }) {
       : text(x, head - (big ? 16 : 12), d.short[lang], { 'text-anchor': 'middle', 'font-size': fs, 'font-weight': 700, fill: T.text });
   });
   let y = head;
-  const row = (id, label, scores, isMain) => {
-    const color = isMain ? clusterColor(id) : subColor(id);
-    const indent = isMain ? 0 : big ? 22 : compact ? 8 : 14;
+  const row = (id, label, scores, level) => {
+    const isMain = level === 0;
+    const color = groupColor(id);
+    const indent = level * (big ? 22 : compact ? 8 : 14);
     const titleSize = isMain ? fs + (big ? 1 : 0) : fs;
     const available = labelW - indent - (big ? 34 : compact ? 16 : 24);
     const full = compact ? id : label;
@@ -203,8 +203,11 @@ export function heatTable({ model, lang, t, width, big = false }) {
     y += rowH;
   };
   for (const c of model.clusters) {
-    row(c.id, `${c.label[lang]} (${c.n})`, c.centroid, true);
-    for (const s of c.children) row(s.id, `${s.label[lang]} (${s.n})`, s.centroid, false);
+    row(c.id, `${c.label[lang]} (${c.n})`, c.centroid, 0);
+    for (const s of c.children) {
+      row(s.id, `${s.label[lang]} (${s.n})`, s.centroid, 1);
+      for (const leaf of s.children) row(leaf.id, `${leaf.label[lang]} (${leaf.n})`, leaf.centroid, 2);
+    }
     y += big ? 12 : 8;
   }
   return { body, width, height: y };
@@ -213,21 +216,29 @@ export function heatTable({ model, lang, t, width, big = false }) {
 /** Silhouette against k, one small multiple per fit, on one shared y scale. */
 export function silhouettePanels({ model, t, lang, width, big = false }) {
   const d = model.diagnostics;
-  const panels = [
-    { key: 'top', title: t('method.silAll'), grid: d.top.grid, k: d.top.selected_k, color: T.text },
-    ...model.clusters.map((c) => ({
-      key: c.id,
-      title: c.label[lang],
-      grid: d.sub[c.id].grid,
-      k: d.sub[c.id].selected_k,
-      color: clusterColor(c.id),
-      reference: d.sub[c.id].reference,
+  const panelRows = [
+    [
+      { key: 'top', title: t('method.silAll'), grid: d.top.grid, k: d.top.selected_k, color: T.text },
+      ...model.clusters.map((c) => ({
+        key: c.id,
+        title: c.label[lang],
+        grid: d.sub[c.id].grid,
+        k: d.sub[c.id].selected_k,
+        color: clusterColor(c.id),
+        reference: d.sub[c.id].reference,
+      })),
+    ],
+    model.clusters.flatMap((c) => c.children).map((s) => ({
+      key: s.id,
+      title: s.label[lang],
+      grid: d.leaf[s.id].grid,
+      k: d.leaf[s.id].selected_k,
+      color: groupColor(s.id),
+      reference: d.leaf[s.id].reference,
     })),
-  ];
+  ].filter((panels) => panels.length);
   const stacked = !big && width < 760;
   const gap = big ? 34 : 20;
-  const n = panels.length;
-  const pw = stacked ? width : (width - gap * (n - 1)) / n;
   const ph = big ? 300 : 190;
   const ml = big ? 44 : 32;
   const mb = big ? 44 : 34;
@@ -235,10 +246,20 @@ export function silhouettePanels({ model, t, lang, width, big = false }) {
   const yMin = 0.2;
   const yMax = 0.55;
   const fs = big ? 15 : 11;
+  const rowH = ph + mt + mb + 14;
+  const placed = [];
+  let rowsUsed = 0;
+  for (const panels of panelRows) {
+    if (stacked) {
+      for (const panel of panels) placed.push({ p: panel, ox: 0, oy: rowsUsed++ * rowH, pw: width });
+    } else {
+      const pw = (width - gap * (panels.length - 1)) / panels.length;
+      panels.forEach((panel, i) => placed.push({ p: panel, ox: i * (pw + gap), oy: rowsUsed * rowH, pw }));
+      rowsUsed++;
+    }
+  }
   let body = '';
-  panels.forEach((p, i) => {
-    const ox = stacked ? 0 : i * (pw + gap);
-    const oy = stacked ? i * (ph + mt + mb + 14) : 0;
+  placed.forEach(({ p, ox, oy, pw }) => {
     const iw = pw - ml - 8;
     const inset = big ? 22 : 16;
     const X = (k) => ox + ml + inset + ((k - 2) / 10) * (iw - inset - 6);
@@ -266,5 +287,5 @@ export function silhouettePanels({ model, t, lang, width, big = false }) {
     }
     body += text(ox + ml + iw / 2, oy + mt + ph + (big ? 42 : 30), t('method.silK'), { 'text-anchor': 'middle', 'font-size': fs, fill: T.text3 });
   });
-  return { body, width, height: stacked ? n * (ph + mt + mb + 14) : ph + mt + mb };
+  return { body, width, height: rowsUsed * rowH - 14 };
 }

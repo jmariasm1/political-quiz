@@ -1,3 +1,4 @@
+import { nearestGroup } from '../core.js';
 import { esc } from '../charts/svg.js';
 import { flagImg, partyLogo } from '../ui.js';
 import { mountMapFigure } from './map.js';
@@ -5,7 +6,7 @@ import { mountMapFigure } from './map.js';
 function savedRow(app, derived) {
   const { t } = app;
   const top = derived.ranked[0];
-  const group = derived.assign.sub ?? derived.assign.main;
+  const group = nearestGroup(derived.assign);
   return `
   <li class="saved">
     ${partyLogo(top.party, 'logo logo-small')}

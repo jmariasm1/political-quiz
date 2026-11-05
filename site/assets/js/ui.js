@@ -1,6 +1,6 @@
 // Small shared UI pieces: chart mounting, PNG buttons, the scope and colour controls, and the tooltip.
 import { normalizeScope, scopeParties } from './core.js';
-import { clusterColor, esc, logoFit, markerPath, shapeOf, subColor } from './charts/svg.js';
+import { esc, groupColor, logoFit, markerPath, shapeOf } from './charts/svg.js';
 import { saveBlob, svgToPngBlob } from './export.js';
 
 export const flagUrl = (flag) => `../assets/flags/${flag}.png`;
@@ -116,7 +116,7 @@ export const toggle = (label, attr, options, current) => `
   </div>`;
 
 export const colorToggle = (app) =>
-  toggle(app.t('colorBy.label'), 'data-color-by', [['cluster', app.t('colorBy.cluster')], ['sub', app.t('colorBy.sub')]], app.colorBy);
+  toggle(app.t('colorBy.label'), 'data-color-by', [['cluster', app.t('colorBy.cluster')], ['sub', app.t('colorBy.sub')], ['leaf', app.t('colorBy.leaf')]], app.colorBy);
 
 export function wireColor(root, app) {
   root.addEventListener('click', (event) => {
@@ -154,7 +154,7 @@ export function hideTip() {
 }
 
 export const groupIcon = (id, isSub, size = 14) =>
-  `<svg aria-hidden="true" width="${size}" height="${size}" viewBox="0 0 16 16"><path d="${markerPath(isSub ? shapeOf(id) : 'circle', 8, 8, 5.5)}" fill="${isSub ? subColor(id) : clusterColor(id)}"/></svg>`;
+  `<svg aria-hidden="true" width="${size}" height="${size}" viewBox="0 0 16 16"><path d="${markerPath(isSub ? shapeOf(id) : 'circle', 8, 8, 5.5)}" fill="${groupColor(id)}"/></svg>`;
 
 export const partyLogo = (party, cls = 'logo') => {
   if (!party.logo) return `<span class="${cls}"><span class="logo-fallback">${esc(party.abbrev)}</span></span>`;

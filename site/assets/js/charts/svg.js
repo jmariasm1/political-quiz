@@ -36,6 +36,18 @@ const SUBS = [
   [['#B7791F', '#E0A93F'], ['#7C8A12', '#B3C03A'], ['#A0522D', '#D2916B'], ['#6E7F1F', '#A5B84E']],
   [['#C2378A', '#F06BB5'], ['#A0307A', '#D977B6'], ['#D15A9E', '#F09CC8'], ['#8E2F6B', '#C76FA6']],
 ];
+// The third level, by main cluster and then subgroup. Eleven colours can't all stay apart for every
+// kind of colour vision, so they're spaced for full colour vision, with shape and direct names as backup.
+const LEAVES = [
+  [
+    [['#00A084', '#14D8B8'], ['#206701', '#2A8A0C']],
+    [['#52BCFC', '#2C8CB8'], ['#27588C', '#63B5FF'], ['#816CE1', '#7B62F2'], ['#9BC222', '#83AE20']],
+  ],
+  [
+    [['#851795', '#D86FE0'], ['#DA3D7E', '#D8487C'], ['#EF7CF3', '#FCB7EE']],
+    [['#A25C00', '#FCC94C'], ['#FC8642', '#ED7326']],
+  ],
+];
 const pick = (pair, mode) => pair[(mode ?? T.mode) === 'dark' ? 1 : 0];
 const parentIndex = (id) => (parseInt(String(id).slice(1), 10) - 1) % MAIN.length;
 
@@ -44,9 +56,31 @@ export function subColor(id, mode) {
   const family = SUBS[parentIndex(id)];
   return pick(family[(String(id).charCodeAt(2) - 97) % family.length], mode);
 }
-/** A party's or group's colour under the chosen view: 'cluster' or 'sub'. */
-export const partyColor = (party, colorBy, mode) =>
-  colorBy === 'sub' && party.sub ? subColor(party.sub, mode) : clusterColor(party.cluster, mode);
+export function leafColor(id, mode) {
+  const [, letter, number] = /^C\d+([a-z])(\d+)$/.exec(id);
+  const family = LEAVES[parentIndex(id) % LEAVES.length];
+  const tones = family[(letter.charCodeAt(0) - 97) % family.length];
+  return pick(tones[(Number(number) - 1) % tones.length], mode);
+}
+/** Any group's colour, from its id: C1 is a main cluster, C1a a subgroup, C1a1 a current. */
+export function groupColor(id, mode) {
+  if (/^C\d+$/.test(id)) return clusterColor(id, mode);
+  return /^C\d+[a-z]$/.test(id) ? subColor(id, mode) : leafColor(id, mode);
+}
+/** The group a party is shown in under the chosen view: 'cluster', 'sub' or 'leaf'. */
+export function partyGroupId(party, colorBy) {
+  if (colorBy === 'leaf') return party.leaf ?? party.sub ?? party.cluster;
+  return colorBy === 'sub' ? party.sub ?? party.cluster : party.cluster;
+}
+export const partyColor = (party, colorBy, mode) => groupColor(partyGroupId(party, colorBy), mode);
+/** The groups a view shows. A group that stayed whole stands in for the level below it. */
+export function groupsAt(model, colorBy) {
+  if (colorBy !== 'sub' && colorBy !== 'leaf') return model.clusters;
+  return model.clusters.flatMap((c) => {
+    if (!c.children.length) return [c];
+    return c.children.flatMap((s) => (colorBy === 'leaf' && s.children.length ? s.children : [s]));
+  });
+}
 
 export const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -178,7 +212,12 @@ export function markerPath(shape, x, y, r) {
   }
 }
 
-export const shapeOf = (subId) => (subId ? MARKERS[(subId.charCodeAt(subId.length - 1) - 97) % MARKERS.length] : 'circle');
+export function shapeOf(id) {
+  const parts = /^C\d+([a-z])(\d+)?$/.exec(id ?? '');
+  if (!parts) return 'circle';
+  const letter = parts[1].charCodeAt(0) - 97;
+  return MARKERS[(parts[2] ? letter * 3 + Number(parts[2]) - 1 : letter) % MARKERS.length];
+}
 
 export function svgDoc(width, height, body, a = {}) {
   return el(
