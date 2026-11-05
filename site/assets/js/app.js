@@ -148,6 +148,7 @@ function refreshThemeButton() {
 /** Charts carry literal colours, so a theme change redraws the current page in place. */
 function applyTheme(theme, rerender) {
   document.documentElement.setAttribute('data-theme', theme);
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', theme === 'dark' ? '#161616' : '#ffffff');
   setChartTheme(theme);
   refreshThemeButton();
   if (rerender) {
@@ -210,16 +211,6 @@ async function start() {
   app.scope = normalizeScope(store.scope(), app.model);
   await Promise.allSettled(['400 13px "Libre Franklin"', '500 13px "Libre Franklin"', '700 13px "Libre Franklin"', '800 20px "Fira Sans Extra Condensed"'].map((f) => document.fonts.load(f)));
   window.addEventListener('hashchange', route);
-  // With no saved choice, follow the device if it changes while the page is open.
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', (event) => {
-    let saved = null;
-    try {
-      saved = window.localStorage.getItem('gic.theme');
-    } catch {
-      saved = null;
-    }
-    if (!saved) applyTheme(event.matches ? 'dark' : 'light', true);
-  });
   route();
   document.documentElement.dataset.ready = 'true';
 }

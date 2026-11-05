@@ -1,4 +1,5 @@
 // Runs before the first paint, so the page never flashes the wrong theme.
+// Light is the default. Dark appears only for someone who chose it with the switch.
 (function () {
   var saved = null;
   try {
@@ -6,6 +7,7 @@
   } catch (e) {
     saved = null;
   }
-  var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  document.documentElement.setAttribute('data-theme', saved === 'dark' || saved === 'light' ? saved : dark ? 'dark' : 'light');
+  var dark = saved === 'dark';
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#161616' : '#ffffff');
 })();

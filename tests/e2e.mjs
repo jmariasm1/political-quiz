@@ -299,20 +299,29 @@ await check('the CSV download has one row per party', async () => {
   assert.equal(fs.readFileSync(file, 'utf8').trim().split('\r\n').length, model.parties.length + 1);
 });
 
-await check('the theme follows the device, and the switch overrides and remembers it', async () => {
-  const dark = await newPage({ colorScheme: 'dark' });
-  await dark.goto(`${base}/en/#/`);
-  await ready(dark);
-  await dark.waitForSelector('[data-party]');
-  assert.equal(await dark.getAttribute('html', 'data-theme'), 'dark');
-  assert.equal(await dark.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(22, 22, 22)');
-  await dark.click('[data-theme-toggle]');
-  assert.equal(await dark.getAttribute('html', 'data-theme'), 'light');
-  assert.equal(await dark.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(255, 255, 255)');
-  await dark.reload();
-  await ready(dark);
-  assert.equal(await dark.getAttribute('html', 'data-theme'), 'light');
-  await dark.context().close();
+await check('light is the default even on a dark-mode device, and the switch changes and remembers it', async () => {
+  const visitor = await newPage({ colorScheme: 'dark' });
+  const background = () => visitor.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const barColour = () => visitor.getAttribute('meta[name="theme-color"]', 'content');
+  await visitor.goto(`${base}/en/#/`);
+  await ready(visitor);
+  await visitor.waitForSelector('[data-party]');
+  assert.equal(await visitor.getAttribute('html', 'data-theme'), 'light');
+  assert.equal(await background(), 'rgb(255, 255, 255)');
+  assert.equal(await barColour(), '#ffffff');
+  await visitor.click('[data-theme-toggle]');
+  assert.equal(await visitor.getAttribute('html', 'data-theme'), 'dark');
+  assert.equal(await background(), 'rgb(22, 22, 22)');
+  assert.equal(await barColour(), '#161616');
+  await visitor.reload();
+  await ready(visitor);
+  assert.equal(await visitor.getAttribute('html', 'data-theme'), 'dark');
+  assert.equal(await barColour(), '#161616');
+  await visitor.click('[data-theme-toggle]');
+  await visitor.reload();
+  await ready(visitor);
+  assert.equal(await visitor.getAttribute('html', 'data-theme'), 'light');
+  await visitor.context().close();
 });
 
 await check('deleting one result and then all data works', async () => {
