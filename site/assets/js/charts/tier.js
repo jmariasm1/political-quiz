@@ -32,16 +32,34 @@ export function tierKey(model, lang, colorBy) {
   return groupsAt(model, colorBy).map((group) => ({ label: group.label[lang], color: groupColor(group.id, 'light') }));
 }
 
+const MIN_COLUMNS = 9;
+const WIDESCREEN = 16 / 9;
+const POSTER_FRAME = 340; // about how tall the title, key and footer are
+
 export function tierPoster({ model, lang, t, groups, tiers, colorBy, logoUrl, flagUrl, title, subtitle, eyebrow, url, flagAspect }) {
-  const COLUMNS = 9;
   const margin = 54;
   const labelW = 190;
   const tileW = 176;
   const tileH = 156;
   const gap = 12;
   const inset = 16;
-  const width = 2 * margin + labelW + 2 * inset + COLUMNS * tileW + (COLUMNS - 1) * gap;
-  const heights = groups.map((g) => Math.max(1, Math.ceil(g.rows.length / COLUMNS)) * (tileH + gap) - gap + 2 * inset);
+  const widthFor = (columns) => 2 * margin + labelW + 2 * inset + columns * tileW + (columns - 1) * gap;
+  const heightsFor = (columns) => groups.map((g) => Math.max(1, Math.ceil(g.rows.length / columns)) * (tileH + gap) - gap + 2 * inset);
+  // Use the column count that brings the poster closest to a widescreen shape, so a long list fits a
+  // regular screen. No more columns than the fullest tier can fill, or a short list would spread thinly.
+  const fullest = Math.max(...groups.map((g) => g.rows.length));
+  let COLUMNS = MIN_COLUMNS;
+  let closest = Infinity;
+  for (let columns = MIN_COLUMNS; columns <= Math.max(MIN_COLUMNS, fullest); columns++) {
+    const height = POSTER_FRAME + heightsFor(columns).reduce((sum, h) => sum + h + 8, 0);
+    const miss = Math.abs(widthFor(columns) / height - WIDESCREEN);
+    if (miss < closest) {
+      closest = miss;
+      COLUMNS = columns;
+    }
+  }
+  const width = widthFor(COLUMNS);
+  const heights = heightsFor(COLUMNS);
 
   let y = 44;
   let body = text(margin, y + 16, eyebrow.toUpperCase(), { 'font-size': 20, 'font-weight': 700, fill: BOARD.text3, 'letter-spacing': 1.2 });

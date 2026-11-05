@@ -293,6 +293,7 @@ await check('every PNG button downloads a real image', async () => {
       const [w, h] = pngSize(file);
       assert.ok(w >= 1200 && h >= 400, `${key}: ${w}x${h}`);
       assert.ok(fs.statSync(file).size > 50_000, `${key} is suspiciously small`);
+      if (key === 'tiers') assert.ok(w / h > 1.4 && w / h < 2.2, `the full tier list should fit a widescreen shape: ${w}x${h}`);
     }
   }
 });
