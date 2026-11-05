@@ -9,6 +9,7 @@ import { mapView } from './views/map.js';
 import { methodView } from './views/method.js';
 import { quizView } from './views/quiz.js';
 import { resultsView } from './views/results.js';
+import { tiersView } from './views/tiers.js';
 
 const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
 const t = createT(lang);
@@ -17,12 +18,14 @@ const ROUTES = {
   '': homeView,
   quiz: quizView,
   results: resultsView,
+  tiers: tiersView,
   map: mapView,
   compare: compareView,
   method: methodView,
 };
 const NAV = [
   ['results', 'nav.results'],
+  ['tiers', 'nav.tiers'],
   ['map', 'nav.map'],
   ['compare', 'nav.compare'],
   ['method', 'nav.method'],
@@ -35,7 +38,7 @@ const app = {
   t,
   store,
   scope: 'all',
-  colorBy: 'cluster',
+  colorBy: 'leaf',
   tierMode: 'fixed',
   derive(result) {
     const scores = scoreAnswers(result.answers, this.model.questions, this.model.dimensions);
@@ -79,7 +82,8 @@ const app = {
     this.emit('scope', this.scope);
   },
   setColorBy(colorBy) {
-    this.colorBy = colorBy === 'sub' || colorBy === 'leaf' ? colorBy : 'cluster';
+    this.colorBy = colorBy === 'sub' || colorBy === 'cluster' ? colorBy : 'leaf';
+    document.querySelectorAll('[data-color-select]').forEach((s) => (s.value = this.colorBy));
     this.emit('color', this.colorBy);
   },
 };
@@ -161,9 +165,12 @@ function applyTheme(theme, rerender) {
 
 function refreshNav() {
   const { name } = parseHash();
-  document.querySelector('[data-nav]').innerHTML = NAV.map(([key, label]) => (
+  const nav = document.querySelector('[data-nav]');
+  nav.innerHTML = NAV.map(([key, label]) => (
     `<a href="#/${key}" ${key === name ? 'aria-current="page"' : ''}>${esc(t(label))}</a>`
   )).join('');
+  // On a phone the tabs can run past the edge, so keep the current one in view.
+  nav.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 function updateLanguageLink() {
@@ -175,12 +182,7 @@ function updateLanguageLink() {
 let cleanup = null;
 
 function route() {
-  let { name, params } = parseHash();
-  // The tier list now lives inside the results story.
-  if (name === 'tiers') {
-    name = 'results';
-    params = { ...params, s: 'tiers' };
-  }
+  const { name, params } = parseHash();
   const view = ROUTES[name] ?? homeView;
   cleanup?.();
   cleanup = null;

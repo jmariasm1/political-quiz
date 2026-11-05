@@ -8,7 +8,7 @@ What a visitor gets:
 
 - A five-dimensional profile (economics, social values, civil liberties, internationalism, climate).
 - A tier list of every party, from S to F, with fixed cutoffs or tiers spread to be as even as possible.
-- A PCA map with the visitor as a point, plus charts that explain what the axes mean. The map and the tier list can colour parties by cluster, subgroup or current.
+- A PCA map with the visitor as a point, plus charts that explain what the axes mean. A choice in the top bar colours the map and the tier list by current (the default), subgroup or cluster.
 - A radar comparison of any two profiles, with "Where they agree and diverge".
 - Filters for the G20, G7, founding BRICS, OECD, full democracies, any grouping you add, or a single country.
 - A PNG download for every chart, and saved results when they come back.

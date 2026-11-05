@@ -4,8 +4,8 @@ import { groupKey, profileChart, rankedBars } from '../charts/misc.js';
 import { esc, groupColor, partyColor, poster, svgDoc } from '../charts/svg.js';
 import { saveBlob } from '../export.js';
 import {
-  countryName, emptyState, flagImg, flagUrl, howTo, iconButton, mountChart, partyLogo, pngButton, scopeLabel, scopeSelect, scopeSlug,
-  visibleSet, wirePng, wireScope,
+  countryName, emptyState, filterFields, flagImg, flagUrl, howTo, iconButton, mountChart, partyLogo, pngButton, scopeLabel, scopeSlug,
+  visibleSet, wireFilters, wirePng,
 } from '../ui.js';
 import { compareSection } from './compare.js';
 import { mapSection } from './map.js';
@@ -98,7 +98,7 @@ export function resultsView(root, app, params) {
 
   <nav class="story-nav" aria-label="${esc(t('nav.menu'))}">
     <div class="story-links">${navItems.map(([id, key]) => `<button type="button" data-jump="${id}">${esc(t(key))}</button>`).join('')}</div>
-    ${scopeSelect(app)}
+    ${filterFields(app)}
   </nav>
 
   <section class="sec" id="s-closest">
@@ -179,7 +179,10 @@ export function resultsView(root, app, params) {
 
   const renderTables = () => {
     const set = new Set(scopeParties(app.scope, model).map((p) => p.id));
-    const codes = model.countries.map((c) => c.code).filter((code) => model.parties.some((p) => p.country === code && set.has(p.id)));
+    const codes = model.countries
+      .filter((c) => model.parties.some((p) => p.country === c.code && set.has(p.id)))
+      .sort((a, b) => a.name[lang].localeCompare(b.name[lang], lang))
+      .map((c) => c.code);
     const open = window.innerWidth >= 760 && codes.length <= 12;
     root.querySelector('[data-tables]').innerHTML = codes
       .map((code) => {
@@ -251,7 +254,7 @@ export function resultsView(root, app, params) {
     },
   }, t);
 
-  wireScope(root, app);
+  wireFilters(root, app);
 
   const motion = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
   const jump = (id) => {

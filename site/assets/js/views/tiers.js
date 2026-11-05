@@ -1,8 +1,8 @@
 import { activeTiers, groupTiers, tierKey, tierPoster, tierRange } from '../charts/tier.js';
 import { esc, partyColor } from '../charts/svg.js';
 import {
-  colorToggle, countryName, flagImg, flagUrl, howTo, logoUrl, partyLogo, pngButton, scopeLabel, scopeSlug, syncToggle, toggle,
-  visibleSet, wireColor, wirePng,
+  countryName, emptyState, filterFields, flagImg, flagUrl, howTo, logoUrl, partyLogo, pngButton, scopeLabel, scopeSlug, syncToggle, toggle,
+  visibleSet, wireFilters, wirePng,
 } from '../ui.js';
 
 /** The tier list, in the meme format of the original chart. */
@@ -50,7 +50,6 @@ export function tierSection(root, app, you, { story = false } = {}) {
           .join('')}
       </div>`;
     syncToggle(root, 'data-mode', app.tierMode);
-    syncToggle(root, 'data-color-by', app.colorBy);
   };
 
   root.innerHTML = `
@@ -61,7 +60,6 @@ export function tierSection(root, app, you, { story = false } = {}) {
     </div>
     <div class="controls">
       ${toggle(t('tiers.modeLabel'), 'data-mode', [['fixed', t('tiers.fixed')], ['spread', t('tiers.spread')]], app.tierMode)}
-      ${colorToggle(app)}
       ${pngButton('tiers', t)}
     </div>
     <div class="tile-keys" data-key></div>
@@ -78,7 +76,6 @@ export function tierSection(root, app, you, { story = false } = {}) {
       renderBoard();
     }
   });
-  wireColor(root, app);
   const off = [app.on('scope', renderBoard), app.on('color', renderBoard)];
 
   wirePng(root, {
@@ -99,4 +96,24 @@ export function tierSection(root, app, you, { story = false } = {}) {
   }, t);
 
   return () => off.forEach((f) => f());
+}
+
+export function tiersView(root, app) {
+  const { t, store } = app;
+  const active = store.active();
+  if (!active) {
+    root.innerHTML = `<header class="page-head"><h1>${esc(t('tiers.title'))}</h1></header>${emptyState(app)}`;
+    return undefined;
+  }
+  root.innerHTML = `
+  <header class="page-head">
+    <h1>${esc(t('tiers.title'))}</h1>
+  </header>
+  <div class="filter-bar">${filterFields(app)}</div>
+  <div data-body></div>`;
+  wireFilters(root, app);
+  const cleanup = tierSection(root.querySelector('[data-body]'), app, app.derive(active));
+  // This page's headline already names the list.
+  root.querySelector('[data-body] .sec-head h2').classList.add('sr-only');
+  return cleanup;
 }

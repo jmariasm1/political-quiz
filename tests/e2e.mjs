@@ -165,31 +165,85 @@ await check('fixed cutoffs are the default, and spread tiers are 5 or 10 points 
   assert.equal(await tileCount(), model.parties.length);
   const labels = await page.$$eval('#s-tiers .tier-label span', (s) => s.map((x) => x.textContent));
   const inner = labels.slice(1, -1).map((l) => l.match(/(\d+) to <(\d+)/).slice(1).map(Number));
-  assert.equal(inner.length, 4);
+  assert.equal(inner.length, 5);
   for (const [a, b] of inner) assert.ok([5, 10].includes(b - a), `${a} to ${b}`);
   await page.click('#s-tiers [data-mode="fixed"]');
 });
 
-await check('tier tiles switch between cluster and subgroup colours', async () => {
+const colourView = (view) => page.selectOption('.story-nav [data-color-select]', view);
+
+await check('fixed tiers between the top and bottom are each 5 points wide', async () => {
+  const labels = await page.$$eval('#s-tiers .tier-label strong', (s) => s.map((x) => x.textContent));
+  assert.deepEqual(labels, ['S', 'A', 'B', 'C', 'D', 'E', 'F']);
+  const ranges = await page.$$eval('#s-tiers .tier-label span', (s) => s.map((x) => x.textContent));
+  assert.deepEqual(ranges, ['70 and up', '65 to <70', '60 to <65', '55 to <60', '50 to <55', '45 to <50', 'Below 45']);
+});
+
+await check('currents are the default view, chosen from the bar beside the party filter', async () => {
   const colours = () => page.$$eval('#s-tiers .tile', (t) => new Set(t.map((x) => x.style.getPropertyValue('--c'))).size);
-  assert.equal(await colours(), model.clusters.length);
-  await page.click('#s-tiers [data-color-by="leaf"]');
+  assert.equal(await page.$eval('.story-nav [data-color-select]', (s) => s.value), 'leaf');
+  assert.ok(await page.$('.story-nav .filters [data-scope-select]'));
+  assert.equal(await page.$('#s-tiers [data-color-select], #s-map [data-color-select]'), null);
   assert.equal(await colours(), leafCount);
   assert.equal((await page.$$('#s-tiers .tile-key')).length, leafCount);
-  await page.click('#s-tiers [data-color-by="sub"]');
+  await colourView('sub');
   assert.equal(await colours(), subCount);
   assert.equal((await page.$$('#s-tiers .tile-key')).length, subCount);
+  await colourView('cluster');
+  assert.equal(await colours(), model.clusters.length);
+  await colourView('sub');
 });
 
 await check('the map follows the same switch, with each subgroup in its own colour', async () => {
   const fills = () => page.$$eval('#s-map [data-party]', (n) => new Set(n.map((x) => x.getAttribute('fill'))).size);
   assert.equal(await fills(), subCount);
-  await page.click('#s-map [data-color-by="leaf"]');
+  await colourView('leaf');
   assert.equal(await fills(), leafCount);
   assert.equal((await page.$$('#s-map .key-btn')).length, leafCount);
-  await page.click('#s-map [data-color-by="cluster"]');
+  await colourView('cluster');
   assert.equal(await fills(), model.clusters.length);
   assert.equal((await page.$$('#s-map .key-btn')).length, model.clusters.length);
+});
+
+await check('the map explains why the closest parties may not look closest', async () => {
+  assert.match(await page.textContent('#s-map .howto-body'), /often aren’t the ones that look closest on the map/);
+});
+
+await check('countries are listed alphabetically in both languages', async () => {
+  const names = () => page.$$eval('#s-all .country summary span', (s) => s.map((x) => x.textContent));
+  for (const lang of ['en', 'es']) {
+    await page.goto(`${base}/${lang}/#/results`);
+    await page.waitForSelector('#s-all .country');
+    const shown = await names();
+    assert.equal(shown.length, model.countries.length);
+    assert.deepEqual(shown, [...shown].sort((a, b) => a.localeCompare(b, lang)));
+  }
+  await page.goto(`${base}/en/#/results`);
+  await page.waitForSelector('#s-tiers .tile');
+});
+
+await check('the tier list has its own tab and page, with the same filters', async () => {
+  await page.click('[data-nav] a[href="#/tiers"]');
+  await page.waitForSelector('.view-tiers .tile');
+  assert.equal(await page.textContent('[data-nav] a[aria-current="page"]'), 'Tier list');
+  assert.equal(await page.textContent('.view-tiers h1'), 'Your tier list');
+  assert.equal((await page.$$('.view-tiers .tile')).length, model.parties.length);
+  await page.selectOption('.filter-bar [data-scope-select]', 'g:g7');
+  assert.equal((await page.$$('.view-tiers .tile')).length, inGroup('g7'));
+  await page.selectOption('.filter-bar [data-scope-select]', 'all');
+  await page.selectOption('.filter-bar [data-color-select]', 'cluster');
+  assert.equal((await page.$$('.view-tiers .tile-key')).length, model.clusters.length);
+  await page.selectOption('.filter-bar [data-color-select]', 'sub');
+  await page.click('.view-tiers .tile[data-compare-party="us-gop"]');
+  await page.waitForSelector('[data-pick="b"]');
+  assert.match(page.url(), /#\/compare\?a=you&b=us-gop/);
+  const fresh = await browser.newContext();
+  const visitor = await fresh.newPage();
+  await visitor.goto(`${base}/en/#/tiers`);
+  await visitor.waitForSelector('.view-tiers .empty');
+  await fresh.close();
+  await page.goto(`${base}/en/#/results`);
+  await page.waitForSelector('#s-tiers .tile');
 });
 
 await check('one filter scopes every chart, by grouping and by country, without moving any party', async () => {
@@ -267,7 +321,7 @@ await check('map labels never overlap, wherever the person lands, in all three c
     await labelled.reload();
     await labelled.waitForSelector('[data-party]');
     for (const view of ['cluster', 'sub', 'leaf']) {
-      await labelled.click(`[data-color-by="${view}"]`);
+      await labelled.selectOption('[data-color-select]', view);
       const clashes = await labelled.$eval('[data-chart="map"] svg', (svg) => {
         const boxes = [...svg.querySelectorAll('text')]
           .filter((t) => !t.hasAttribute('transform'))
@@ -417,12 +471,14 @@ await check('no page scrolls sideways, in either language', async () => {
   await answerQuiz(phone, 3);
   await phone.waitForSelector('.story-head h1');
   for (const lang of ['en', 'es']) {
-    for (const hash of ['#/', '#/quiz?new=1', '#/results', '#/map', '#/compare', '#/method']) {
+    for (const hash of ['#/', '#/quiz?new=1', '#/results', '#/tiers', '#/map', '#/compare', '#/method']) {
       await phone.goto(`${base}/${lang}/${hash}`);
       await ready(phone);
       await phone.waitForTimeout(150);
       const extra = await phone.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       assert.ok(extra <= 0, `${lang} ${hash} overflows by ${extra}px`);
+      const hiddenTabs = await phone.$eval('[data-nav]', (n) => n.scrollWidth - n.clientWidth);
+      assert.ok(hiddenTabs <= 0, `${lang} ${hash}: tabs run ${hiddenTabs}px past the screen`);
     }
   }
 });

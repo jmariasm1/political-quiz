@@ -87,7 +87,7 @@ export const scopeLabel = (scope, model, t) => {
 export const scopeSlug = (scope) => String(scope).replace(':', '-').toLowerCase();
 
 /** One control for every filter: all parties, a grouping, or a single country. */
-export function scopeSelect(app) {
+function scopeSelect(app) {
   const { model, t, scope } = app;
   const opt = (value, label) => `<option value="${esc(value)}" ${scope === value ? 'selected' : ''}>${esc(label)}</option>`;
   const countries = model.countries.slice().sort((a, b) => a.name[t.lang].localeCompare(b.name[t.lang], t.lang));
@@ -102,9 +102,24 @@ export function scopeSelect(app) {
   </label>`;
 }
 
-export function wireScope(root, app) {
+function colorSelect(app) {
+  const { t, colorBy } = app;
+  return `
+  <label class="field">
+    <span>${esc(t('colorBy.label'))}</span>
+    <select data-color-select>
+      ${['leaf', 'sub', 'cluster'].map((view) => `<option value="${view}" ${colorBy === view ? 'selected' : ''}>${esc(t(`colorBy.${view}`))}</option>`).join('')}
+    </select>
+  </label>`;
+}
+
+/** The two choices that apply to every chart on a page. They sit together in the page's top bar. */
+export const filterFields = (app) => `<div class="filters">${scopeSelect(app)}${colorSelect(app)}</div>`;
+
+export function wireFilters(root, app) {
   root.addEventListener('change', (event) => {
     if (event.target.matches('[data-scope-select]')) app.setScope(event.target.value);
+    if (event.target.matches('[data-color-select]')) app.setColorBy(event.target.value);
   });
 }
 
@@ -114,16 +129,6 @@ export const toggle = (label, attr, options, current) => `
     <span class="toggle-label">${esc(label)}</span>
     ${options.map(([value, text]) => `<button type="button" ${attr}="${esc(value)}" aria-pressed="${value === current}">${esc(text)}</button>`).join('')}
   </div>`;
-
-export const colorToggle = (app) =>
-  toggle(app.t('colorBy.label'), 'data-color-by', [['cluster', app.t('colorBy.cluster')], ['sub', app.t('colorBy.sub')], ['leaf', app.t('colorBy.leaf')]], app.colorBy);
-
-export function wireColor(root, app) {
-  root.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-color-by]');
-    if (button) app.setColorBy(button.dataset.colorBy);
-  });
-}
 
 export const syncToggle = (root, attr, current) =>
   root.querySelectorAll(`[${attr}]`).forEach((b) => b.setAttribute('aria-pressed', String(b.getAttribute(attr) === current)));

@@ -90,8 +90,12 @@ test('tiers follow the fixed cutoffs at their boundaries', () => {
   assert.equal(id(69.99), 'A');
   assert.equal(id(65), 'A');
   assert.equal(id(60), 'B');
-  assert.equal(id(50), 'C');
-  assert.equal(id(45), 'D');
+  assert.equal(id(59.99), 'C');
+  assert.equal(id(55), 'C');
+  assert.equal(id(54.99), 'D');
+  assert.equal(id(50), 'D');
+  assert.equal(id(49.99), 'E');
+  assert.equal(id(45), 'E');
   assert.equal(id(44.99), 'F');
   assert.equal(id(0), 'F');
 });

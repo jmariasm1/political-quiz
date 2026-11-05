@@ -4,8 +4,8 @@ import { heatTable } from '../charts/misc.js';
 import { mapGroups, pcaChart, pcaLegendSvg } from '../charts/pca.js';
 import { T, esc, g, poster, svgDoc, text } from '../charts/svg.js';
 import {
-  colorToggle, countryName, flagImg, groupIcon, hideTip, howTo, mountChart, partyLogo, pngButton, scopeLabel, scopeSelect, scopeSlug,
-  showTip, syncToggle, visibleSet, wireColor, wirePng, wireScope,
+  countryName, filterFields, flagImg, groupIcon, hideTip, howTo, mountChart, partyLogo, pngButton, scopeLabel, scopeSlug,
+  showTip, visibleSet, wireFilters, wirePng,
 } from '../ui.js';
 
 // The map opens fitted to its column. A button switches to a wider version that pans sideways and
@@ -160,7 +160,6 @@ export function mapSection(root, app, { params = {}, you = null, story = false }
       <p class="takeaway">${esc(you ? t('map.take', { phrase: nearestPhrase }) : t('map.takeNoYou'))}</p>
     </div>
     <div class="controls">
-      ${colorToggle(app)}
       <button type="button" class="link-btn" data-map-toggle hidden></button>
       ${pngButton('map', t)}
     </div>
@@ -175,6 +174,7 @@ export function mapSection(root, app, { params = {}, you = null, story = false }
     <div data-detail></div>
     ${howTo(t, `
       <p>${esc(t('map.how'))}</p>
+      <p>${esc(t('map.closeNote'))}</p>
       ${you ? `<p>${esc(fidelityText())}</p>` : ''}
       ${model.clusters.map((c) => `<p>${esc(splitNote(c, model.diagnostics.sub[c.id], ''))}</p>`).join('')}
       ${model.clusters.flatMap((c) => c.children).map((s) => `<p>${esc(splitNote(s, model.diagnostics.leaf[s.id], 'Leaf'))}</p>`).join('')}
@@ -293,8 +293,6 @@ export function mapSection(root, app, { params = {}, you = null, story = false }
   root.addEventListener('click', (event) => {
     if (event.target.closest('[data-map-toggle]')) figure.state.togglePan();
   });
-  wireColor(root, app);
-
   const off = [
     app.on('scope', () => {
       root.querySelector('[data-map-table]').innerHTML = tableRows();
@@ -305,7 +303,6 @@ export function mapSection(root, app, { params = {}, you = null, story = false }
     }),
     app.on('color', () => {
       root.querySelector('[data-key]').innerHTML = legend();
-      syncToggle(root, 'data-color-by', app.colorBy);
     }),
   ];
 
@@ -384,9 +381,9 @@ export function mapView(root, app, params) {
   <header class="page-head">
     <h1>${esc(t('map.title'))}</h1>
   </header>
-  <div class="filter-bar">${scopeSelect(app)}</div>
+  <div class="filter-bar">${filterFields(app)}</div>
   <div data-body></div>`;
-  wireScope(root, app);
+  wireFilters(root, app);
   const cleanup = mapSection(root.querySelector('[data-body]'), app, { params, you });
   // This page's headline already names the map.
   root.querySelector('[data-body] .sec-head h2').classList.add('sr-only');

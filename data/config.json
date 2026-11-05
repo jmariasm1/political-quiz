@@ -122,13 +122,18 @@
     },
     {
       "id": "C",
-      "min": 50,
+      "min": 55,
       "color": "#e5ed88"
     },
     {
       "id": "D",
+      "min": 50,
+      "color": "#a4e9a7"
+    },
+    {
+      "id": "E",
       "min": 45,
-      "color": "#9de9a9"
+      "color": "#9cded4"
     },
     {
       "id": "F",
