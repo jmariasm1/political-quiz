@@ -19,6 +19,19 @@ function savedRow(app, derived) {
   </li>`;
 }
 
+function legacyRow(app, result) {
+  const { t } = app;
+  return `
+  <li class="saved">
+    <div class="saved-body">
+      <p class="saved-main"><b>${esc(t.date(result.at))}</b></p>
+      <p class="saved-sub">${esc(t('home.legacy'))}</p>
+    </div>
+    <a class="text-link" href="#/quiz?finish=${esc(result.id)}">${esc(t('home.finish'))}</a>
+    <button type="button" class="text-link quiet" data-delete="${esc(result.id)}" aria-label="${esc(t('home.deleteNamed', { date: t.date(result.at) }))}">${esc(t('home.delete'))}</button>
+  </li>`;
+}
+
 export function homeView(root, app) {
   const { t, model, store } = app;
   let figure = null;
@@ -27,11 +40,14 @@ export function homeView(root, app) {
     const results = store.results();
     const draft = store.draft();
     const answered = draft ? draft.answers.filter(Boolean).length : 0;
+    const legacy = store.legacy();
     const latest = results.length ? results[results.length - 1] : null;
-    const primaryHref = latest ? `#/results?r=${latest.id}` : '#/quiz';
-    const primaryLabel = latest ? t('home.view') : answered ? t('home.resume', { n: answered }) : t('home.start');
+    const oldest = legacy.at(-1);
+    const total = model.questions.length;
+    const primaryHref = latest ? `#/results?r=${latest.id}` : !answered && oldest ? `#/quiz?finish=${oldest.id}` : '#/quiz';
+    const primaryLabel = latest ? t('home.view') : answered ? t('home.resume', { n: answered, total }) : oldest ? t('home.finish') : t('home.start');
     const secondary = latest
-      ? `<a class="text-link" href="#/quiz?new=1">${esc(answered ? t('home.resume', { n: answered }) : t('home.retake'))}</a>`
+      ? `<a class="text-link" href="#/quiz?new=1">${esc(answered ? t('home.resume', { n: answered, total }) : t('home.retake'))}</a>`
       : `<a class="text-link" href="#/map">${esc(t('home.explore'))}</a>`;
     root.innerHTML = `
     <section class="hero">
@@ -50,10 +66,10 @@ export function homeView(root, app) {
       <figcaption class="meta">${esc(t('home.mapCaption'))}</figcaption>
     </figure>
     ${
-      results.length
+      results.length || legacy.length
         ? `<section class="sec" aria-labelledby="saved-h">
             <div class="sec-head"><h2 id="saved-h">${esc(t('home.saved'))}</h2></div>
-            <ul class="saved-list">${results.slice().reverse().map((r) => savedRow(app, app.derive(r))).join('')}</ul>
+            <ul class="saved-list">${results.slice().reverse().map((r) => savedRow(app, app.derive(r))).join('')}${legacy.slice().reverse().map((r) => legacyRow(app, r)).join('')}</ul>
             <button type="button" class="text-link quiet" data-delete-all>${esc(t('home.deleteAll'))}</button>
           </section>`
         : ''

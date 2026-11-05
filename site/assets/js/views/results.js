@@ -1,5 +1,5 @@
 // The results story: one scrolling page, from the written headline down to the full ranking.
-import { allGroups, csvCell, mostDistinctive, nearestDistance, nearestGroup, rankingRows, rmsd, scopeParties } from '../core.js';
+import { allGroups, answerDistance, csvCell, mostDistinctive, nearestDistance, nearestGroup, rankingRows, scopeParties } from '../core.js';
 import { groupKey, profileChart, rankedBars } from '../charts/misc.js';
 import { esc, groupColor, partyColor, poster, svgDoc } from '../charts/svg.js';
 import { saveBlob } from '../export.js';
@@ -52,7 +52,7 @@ export function resultsView(root, app, params) {
     return out;
   };
   const distanceRows = () => {
-    const rows = allGroups(model).map((c) => ({ label: c.label[lang], value: rmsd(scores, c.centroid), color: groupColor(c.id), digits: 1 }));
+    const rows = allGroups(model).map((c) => ({ label: c.label[lang], value: answerDistance(you.answers, c.answers), color: groupColor(c.id), digits: 1 }));
     return rows.sort((a, b) => a.value - b.value);
   };
   const scopeNote = () => (app.scope === 'all' ? '' : ` · ${scopeLabel(app.scope, model, t)}`);
@@ -276,7 +276,7 @@ export function resultsView(root, app, params) {
     }
     if (!event.target.closest('[data-csv]')) return;
     const head = ['Global rank', 'Rank in country', 'Country', 'Party', 'Abbreviation', 'Main cluster', 'Subgroup', 'Current', 'Similarity', ...model.dimensions.map((d) => d.name[lang])];
-    const lines = [head, ...rankingRows(scores, model, lang).map((r) => [r.globalRank, r.countryRank, r.country, r.party, r.abbrev, r.cluster, r.subgroup, r.current, r.similarity.toFixed(2), ...r.scores])];
+    const lines = [head, ...rankingRows(you.answers, model, lang).map((r) => [r.globalRank, r.countryRank, r.country, r.party, r.abbrev, r.cluster, r.subgroup, r.current, r.similarity.toFixed(2), ...r.scores])];
     const csv = lines.map((row) => row.map(csvCell).join(',')).join('\r\n');
     saveBlob(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }), `compass-ranking-${lang}.csv`);
   });

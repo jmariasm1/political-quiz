@@ -2,4 +2,5 @@ id,name_en,name_es,countries
 g20,G20,G20,US;CA;UK;DE;FR;IT;JP;BR;RU;IN;CN;ZA;AR;AU;ID;MX;SA;KR;TR
 g7,G7,G7,US;CA;UK;DE;FR;IT;JP
 brics,Founding BRICS,BRICS fundadores,BR;RU;IN;CN;ZA
+oecd,OECD,OCDE,AU;AT;BE;CA;CL;CO;CR;CZ;DK;EE;FI;FR;DE;GR;HU;IS;IE;IL;IT;JP;KR;LV;LT;LU;MX;NL;NZ;NO;PL;PT;SK;SI;ES;SE;CH;TR;UK;US
 full-democracies,Full democracies (EIU 2025),Democracias plenas (EIU 2025),NO;NZ;DK;IS;FI;SE;IE;CH;CA;LU;NL;UY;AU;JP;TW;DE;AT;UK;CR;PT;MU;ES;CZ;GR;EE;FR

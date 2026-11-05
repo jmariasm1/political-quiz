@@ -36,16 +36,16 @@ const SUBS = [
   [['#B7791F', '#E0A93F'], ['#7C8A12', '#B3C03A'], ['#A0522D', '#D2916B'], ['#6E7F1F', '#A5B84E']],
   [['#C2378A', '#F06BB5'], ['#A0307A', '#D977B6'], ['#D15A9E', '#F09CC8'], ['#8E2F6B', '#C76FA6']],
 ];
-// The third level, by main cluster and then subgroup. Eleven colours can't all stay apart for every
+// The third level, by main cluster and then subgroup. These colours can't all stay apart for every
 // kind of colour vision, so they're spaced for full colour vision, with shape and direct names as backup.
 const LEAVES = [
   [
-    [['#00A084', '#14D8B8'], ['#206701', '#2A8A0C']],
-    [['#52BCFC', '#2C8CB8'], ['#27588C', '#63B5FF'], ['#816CE1', '#7B62F2'], ['#9BC222', '#83AE20']],
+    [['#00A084', '#14D8B8'], ['#206701', '#3E9A1F'], ['#9BC222', '#C4D142']],
+    [['#52BCFC', '#7AD3FF'], ['#27588C', '#4F7FE8'], ['#816CE1', '#7B62F2']],
   ],
   [
     [['#851795', '#D86FE0'], ['#DA3D7E', '#D8487C'], ['#EF7CF3', '#FCB7EE']],
-    [['#A25C00', '#FCC94C'], ['#FC8642', '#ED7326']],
+    [['#A25C00', '#A66F2C'], ['#FC8642', '#FF7A45']],
   ],
 ];
 const pick = (pair, mode) => pair[(mode ?? T.mode) === 'dark' ? 1 : 0];

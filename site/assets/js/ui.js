@@ -167,6 +167,8 @@ export const flagImg = (party, cls = 'flag') => `<img class="${cls}" src="${esc(
 export const countryName = (code, app) => app.model.countries.find((c) => c.code === code)?.name[app.t.lang] ?? code;
 
 export function emptyState(app) {
-  const { t } = app;
+  const { t, store } = app;
+  const old = store.legacy().at(-1);
+  if (old) return `<div class="empty"><p>${esc(t('common.legacyResult'))}</p><a class="cta" href="#/quiz?finish=${esc(old.id)}">${esc(t('home.finish'))}</a></div>`;
   return `<div class="empty"><p>${esc(t('common.noResult'))}</p><a class="cta" href="#/quiz">${esc(t('common.takeQuiz'))}</a></div>`;
 }

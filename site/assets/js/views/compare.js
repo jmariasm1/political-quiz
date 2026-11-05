@@ -14,20 +14,20 @@ export function compareSection(root, app, { params = {}, story = false } = {}) {
 
   // One lookup for everything that can fill a profile slot.
   const resolve = (id) => {
-    if (id === 'you' && you) return { id, title: t('common.youCaps'), sub: t('common.yourAnswers'), scores: you.scores, speaker: t('common.you'), isYou: true };
+    if (id === 'you' && you) return { id, title: t('common.youCaps'), sub: t('common.yourAnswers'), scores: you.scores, answers: you.answers, speaker: t('common.you'), isYou: true };
     if (id?.startsWith('r:')) {
       const r = store.get(id.slice(2));
       if (r) {
         const date = t.date(r.at);
-        return { id, title: t('common.youCaps'), sub: t('compare.pastSub', { date }), scores: app.derive(r).scores, speaker: t('compare.pastSpeaker', { date: t.short(r.at) }) };
+        return { id, title: t('common.youCaps'), sub: t('compare.pastSub', { date }), scores: app.derive(r).scores, answers: r.answers, speaker: t('compare.pastSpeaker', { date: t.short(r.at) }) };
       }
     }
     if (id?.startsWith('cl:')) {
       const c = clusters.find((x) => x.id === id.slice(3));
-      if (c) return { id, title: c.label[lang], sub: t('compare.clusterSub', { n: c.n }), scores: c.centroid, speaker: c.label[lang] };
+      if (c) return { id, title: c.label[lang], sub: t('compare.clusterSub', { n: c.n }), scores: c.centroid, answers: c.answers, speaker: c.label[lang] };
     }
     const p = model.parties.find((x) => x.id === id);
-    if (p) return { id, title: p.label, sub: `${countryName(p.country, app)} · ${p.name[lang]}`, scores: p.scores, speaker: p.label };
+    if (p) return { id, title: p.label, sub: `${countryName(p.country, app)} · ${p.name[lang]}`, scores: p.scores, answers: p.answers, speaker: p.label };
     return null;
   };
 
@@ -140,7 +140,7 @@ export function compareSection(root, app, { params = {}, story = false } = {}) {
     B = resolve(b);
     root.querySelector('[data-pick="a"]').innerHTML = options(a);
     root.querySelector('[data-pick="b"]').innerHTML = options(b);
-    const score = similarity(A.scores, B.scores);
+    const score = similarity(A.answers, B.answers);
     root.querySelector('[data-score]').innerHTML = `
       <p class="cmp-who"><b>${esc(A.title)}</b> <span>${esc(A.sub)}</span></p>
       <p class="cmp-big">${esc(t.num(Math.round(score), 0))}<span>/100</span></p>
@@ -185,7 +185,7 @@ export function compareSection(root, app, { params = {}, story = false } = {}) {
       const gap = 56;
       const rightW = CW - leftW - gap;
       const rad = radarChart({ model, lang, t, a: A.scores, b: B.scores, width: leftW, big: true });
-      const score = similarity(A.scores, B.scores);
+      const score = similarity(A.answers, B.answers);
       // Left column: who, score, radar
       let left = '';
       [[A, T.you], [B, T.other]].forEach(([P, color], i) => {

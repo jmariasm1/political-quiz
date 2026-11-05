@@ -1,6 +1,6 @@
 # Global Ideological Compass
 
-A 20-statement political quiz that places you among 268 parties in the G20 and the countries the EIU classes as full democracies. It runs entirely in the browser, in English and Spanish. Answers stay on the visitor's device: there is no server, no account and no analytics.
+A 25-statement political quiz that places you among 365 parties in the G20, the OECD and the countries the EIU classes as full democracies. It runs entirely in the browser, in English and Spanish. Answers stay on the visitor's device: there is no server, no account and no analytics.
 
 **Live site:** https://jmariasm1.github.io/political-quiz/
 
@@ -10,7 +10,7 @@ What a visitor gets:
 - A tier list of every party, from S to F, with fixed cutoffs or tiers spread to be as even as possible.
 - A PCA map with the visitor as a point, plus charts that explain what the axes mean. The map and the tier list can colour parties by cluster, subgroup or current.
 - A radar comparison of any two profiles, with "Where they agree and diverge".
-- Filters for the G20, G7, founding BRICS, full democracies, any grouping you add, or a single country.
+- Filters for the G20, G7, founding BRICS, OECD, full democracies, any grouping you add, or a single country.
 - A PNG download for every chart, and saved results when they come back.
 
 ## Updating the site
@@ -21,7 +21,7 @@ Saved results store raw answers, so returning visitors are re-scored against the
 
 ### Change a party's position
 
-Edit its row in [`data/parties.csv`](data/parties.csv). Scores run from 0 to 100, and `last_reviewed` is shown on the Method page.
+Edit its answers in [`data/parties.csv`](data/parties.csv): `q01` to `q25`, each from 1 to 5, in the question order of [`data/questions.json`](data/questions.json). Its five scores are calculated from them. `last_reviewed` is shown on the Method page.
 
 ### Add a party
 
@@ -45,7 +45,7 @@ It appears in the filters by itself.
 
 ### Rename a cluster, subgroup or current
 
-Group names are in [`data/cluster_labels.csv`](data/cluster_labels.csv), each with a short label, a phrase that fits inside a sentence ("You sit closest to the progressive liberals") and a one-line description, in both languages. Each row is tied to the group containing its `anchors` (party ids), not to a fixed number, so names keep following the right group as the data changes. If an update creates a group that no row matches, it gets an automatic name built from its scores, and the build prints a warning telling you to name it.
+Group names are in [`data/cluster_labels.csv`](data/cluster_labels.csv), each with a short label, a phrase that fits inside a sentence ("You sit closest to the market liberals") and a one-line description, in both languages. Each row is tied to the group containing its `anchors` (party ids), not to a fixed number, so names keep following the right group as the data changes. If an update creates a group that no row matches, it gets an automatic name built from its scores, and the build prints a warning telling you to name it.
 
 ### Change tier cutoffs or thresholds
 
@@ -97,13 +97,13 @@ If your data has a mistake, `build_model.py` stops and names the file and line.
 
 ## How the model works
 
-- **Scoring:** the original questionnaire. Each dimension is `6.25 × (sum of four recoded answers − 4)`.
-- **Similarity:** `100 − RMSD` across the five dimensions, equally weighted.
-- **Main clusters:** k-means, with k chosen by the highest mean silhouette on k = 2 to 12.
+- **Scoring:** 25 statements, five per dimension. Each dimension is `5 × (sum of five recoded answers − 5)`.
+- **Similarity:** `100 − 25 × RMS(difference between answers)` across all 25 answers, so every question weighs the same. Party answers are the calibrated fractional values.
+- **Main clusters:** k-means on the 25 answers, with k chosen by the highest mean silhouette on k = 2 to 12.
 - **Subgroups:** the same procedure inside each main cluster, with no number imposed. Solutions containing a one-party group are rejected, and a cluster stays whole if its best silhouette is under 0.25.
 - **Currents:** the same procedure and rules again, inside each subgroup.
 - **Checks shown beside the groups, never used to choose them:** a reference test against structureless data, and bootstrap stability (Hennig's cluster-wise Jaccard).
-- **PCA:** fitted once on the parties, only to draw the map. A fixed sign rule stops the axes flipping when data changes.
+- **PCA:** fitted once on the parties' five scores, only to draw the map. A fixed sign rule stops the axes flipping when data changes.
 
 The Method page on the site explains all of this, with the diagnostics.
 
@@ -120,7 +120,7 @@ Interface text is in `site/assets/js/i18n.js`. A test fails if a string exists i
 
 ## Limits
 
-This is an exploratory questionnaire, not a validated political-science scale. Party positions were estimated by hand, with AI assistance, and are not measured with the same survey as visitors' answers. It is not voting advice.
+This is an exploratory questionnaire, not a validated political-science scale. Party answers are modeled estimates, made by hand with AI assistance. No party filled in this questionnaire, and fractional answers come from a calibration, not from evidence of that precision. It is not voting advice.
 
 ## Credits
 

@@ -1,4 +1,4 @@
-import { componentPoles, finestGroupOf, mapFidelity, nearestGroup, project, rmsd } from '../core.js';
+import { componentPoles, finestGroupOf, mapFidelity, nearestGroup, project, similarity } from '../core.js';
 import { circlePanel, loadingsPanel, variancePanel, youPanel } from '../charts/interpret.js';
 import { heatTable } from '../charts/misc.js';
 import { mapGroups, pcaChart, pcaLegendSvg } from '../charts/pca.js';
@@ -72,7 +72,7 @@ export function mountMapFigure(host, app, { you = null, past = [], hero = false,
         <p class="tip-name">${esc(p.name[lang])}</p>
         <p class="tip-country">${flagImg(p, 'flag-inline')} ${esc(countryName(p.country, app))}</p>
         <p class="tip-group">${esc(p.label)} · ${esc(groupName(p))}</p>
-        ${you ? `<p class="tip-score"><b>${esc(t.num(100 - rmsd(you.scores, p.scores), 2))}</b> ${esc(t('map.closeness').toLowerCase())}</p>` : ''}
+        ${you ? `<p class="tip-score"><b>${esc(t.num(similarity(you.answers, p.answers), 2))}</b> ${esc(t('map.closeness').toLowerCase())}</p>` : ''}
       </div>
     </div>`;
   const onMove = (event) => {
@@ -109,7 +109,7 @@ export function mapSection(root, app, { params = {}, you = null, story = false }
   const lang = t.lang;
   const past = you ? store.results().filter((r) => r.id !== you.result.id).map((r) => ({ scores: app.derive(r).scores })) : [];
   const closest = you ? you.ranked.slice(0, 3).map((r) => r.party.id) : [];
-  const youArg = you ? { scores: you.scores, label: t('common.youCaps'), closest } : null;
+  const youArg = you ? { scores: you.scores, answers: you.answers, label: t('common.youCaps'), closest } : null;
   const expl = model.pca.explained;
   const pctTwo = t.num((expl[0] + expl[1]) * 100, 1);
   const poles = [0, 1].map((c) => componentPoles(c, model.pca, model.dimensions, lang));
@@ -144,7 +144,7 @@ export function mapSection(root, app, { params = {}, you = null, story = false }
         <td>${esc(p.leaf ?? p.sub ?? p.cluster)}</td>
         <td class="num">${esc(t.num(p.pc[0], 1))}</td>
         <td class="num">${esc(t.num(p.pc[1], 1))}</td>
-        ${you ? `<td class="num">${esc(t.num(100 - rmsd(you.scores, p.scores), 2))}</td>` : ''}
+        ${you ? `<td class="num">${esc(t.num(similarity(you.answers, p.answers), 2))}</td>` : ''}
       </tr>`)
       .join('');
   };
@@ -264,7 +264,7 @@ export function mapSection(root, app, { params = {}, you = null, story = false }
         <p><b>${esc(p.label)}</b> ${esc(p.name[lang])}</p>
         <p class="meta">${flagImg(p, 'flag-inline')} ${esc(countryName(p.country, app))} · ${esc(finestGroupOf(p, model).label[lang])}</p>
       </div>
-      ${you ? `<p class="detail-score"><b>${esc(t.num(100 - rmsd(you.scores, p.scores), 2))}</b><span>${esc(t('map.closeness'))}</span></p>` : ''}
+      ${you ? `<p class="detail-score"><b>${esc(t.num(similarity(you.answers, p.answers), 2))}</b><span>${esc(t('map.closeness'))}</span></p>` : ''}
       <a class="text-link" href="#/compare?a=${you ? 'you' : model.parties[0].id}&b=${esc(p.id)}" data-compare-party="${esc(p.id)}">${esc(you ? t('common.compareWithYou') : t('common.compare'))}</a>
     </div>`;
   };

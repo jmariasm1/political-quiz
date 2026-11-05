@@ -27,20 +27,32 @@ def test_clusters_are_chosen_by_the_highest_silhouette():
     assert sum(c['n'] for c in MODEL['clusters']) == len(MODEL['parties'])
 
 
-def test_the_original_65_parties_still_give_the_original_solution():
-    # The first 65 parties, taken on their own, must still give the solution first published for them.
-    rows = fresh_inputs()['parties'][:65]
-    X = np.array([[float(r[d]) for d in DIMS] for r in rows])
-    grid = bm.silhouette_grid(X, 12, 41, 60, 1)
-    by_k = {row['k']: row['silhouette'] for row in grid}
-    assert by_k[2] == pytest.approx(0.4792, abs=1e-4)
-    assert by_k[3] == pytest.approx(0.4479, abs=1e-4)
-    assert max(by_k, key=by_k.get) == 2
-    model = bm.fit_kmeans(X, 2, 41, 100)
-    assert sorted(np.bincount(model.labels_).tolist()) == [26, 39]
-    pca = bm.fit_pca(X)
-    assert pca['explained'][0] == pytest.approx(0.787, abs=0.001)
-    assert pca['explained'][1] == pytest.approx(0.177, abs=0.001)
+def test_scores_follow_the_questionnaire_formula():
+    questions = MODEL['questions']
+    for party in MODEL['parties']:
+        for score, dim in zip(party['scores'], MODEL['dimensions']):
+            items = [(q['sign'], party['answers'][i]) for i, q in enumerate(questions) if q['dim'] == dim['id']]
+            assert len(items) == 5
+            total = sum(sign * (answer - 3) for sign, answer in items)
+            assert score == pytest.approx(50 + 5 * total, abs=0.02)
+
+
+def test_groups_are_found_on_the_answers_not_the_scores():
+    answers = np.array([p['answers'] for p in MODEL['parties']])
+    params = MODEL['diagnostics']['params']
+    k = MODEL['diagnostics']['top']['selected_k']
+    model = bm.fit_kmeans((answers - 1) * 25, k, params['seed'], 100)
+    ids = np.array([p['id'] for p in MODEL['parties']])
+    found = {frozenset(ids[model.labels_ == c].tolist()) for c in range(k)}
+    assert found == {frozenset(c['members']) for c in MODEL['clusters']}
+
+
+def test_questions_are_numbered_in_the_order_the_quiz_shows_them():
+    questions = MODEL['questions']
+    assert [q['id'] for q in questions] == list(range(1, 26))
+    assert sorted(q['no'] for q in questions) == list(range(1, 26))
+    for dim_index, dim in enumerate(MODEL['dimensions']):
+        assert sorted(q['no'] for q in questions if q['dim'] == dim['id']) == list(range(dim_index * 5 + 1, dim_index * 5 + 6))
 
 
 def test_subgroups_partition_each_main_cluster():
@@ -60,17 +72,22 @@ def test_subgroup_count_is_the_silhouette_maximum():
 
 def test_currents_partition_each_subgroup_and_follow_the_same_rule():
     parties = {p['id']: p for p in MODEL['parties']}
+    floor = MODEL['diagnostics']['params']['min_split_silhouette']
     for cluster in MODEL['clusters']:
         for sub in cluster['children']:
             diag = MODEL['diagnostics']['leaf'][sub['id']]
+            eligible = [row for row in diag['grid'] if row['eligible']]
+            best = max(eligible, key=lambda r: r['silhouette'])
+            if best['silhouette'] < floor:
+                # Too little structure to split: the subgroup stays whole and has no currents.
+                assert diag['selected_k'] == 1 and sub['children'] == []
+                assert all(parties[m]['leaf'] is None for m in sub['members'])
+                continue
+            assert diag['selected_k'] == best['k'] == len(sub['children'])
             members = [m for leaf in sub['children'] for m in leaf['members']]
             assert sorted(members) == sorted(sub['members'])
-            assert all(leaf['n'] >= 2 and leaf['parent'] == sub['id'] for leaf in sub['children'])
-            eligible = [row for row in diag['grid'] if row['eligible']]
-            assert diag['selected_k'] == max(eligible, key=lambda r: r['silhouette'])['k']
-            assert diag['silhouette'] >= MODEL['diagnostics']['params']['min_split_silhouette']
-            assert len(sub['children']) == diag['selected_k']
             for leaf in sub['children']:
+                assert leaf['n'] >= 2 and leaf['parent'] == sub['id']
                 assert all(parties[m]['leaf'] == leaf['id'] and parties[m]['sub'] == sub['id'] for m in leaf['members'])
 
 
@@ -79,7 +96,9 @@ def test_a_current_is_the_kmeans_solution_for_its_subgroup():
     params = MODEL['diagnostics']['params']
     for cluster in MODEL['clusters']:
         for sub in cluster['children']:
-            Y = np.array([parties[m]['scores'] for m in sub['members']])
+            if not sub['children']:
+                continue
+            Y = (np.array([parties[m]['answers'] for m in sub['members']]) - 1) * 25
             model = bm.fit_kmeans(Y, len(sub['children']), params['seed'], 200)
             found = {frozenset(np.array(sub['members'])[model.labels_ == k].tolist()) for k in range(len(sub['children']))}
             assert found == {frozenset(leaf['members']) for leaf in sub['children']}
@@ -101,7 +120,8 @@ def test_repeated_abbreviations_get_a_country_on_their_label():
     assert labels['us-dem'] == 'DEM US' and labels['tr-dem'] == 'DEM TR' and labels['id-demokrat'] == 'DEM ID'
     assert labels['id-pan'] == 'PAN ID' and labels['mx-pan'] == 'PAN MX' and labels['pt-pan'] == 'PAN PT'
     assert labels['ee-kesk'] == 'KESK EE' and labels['fi-kesk'] == 'KESK FI'
-    assert labels['fr-rn'] == 'RN'
+    assert labels['fr-rn'] == 'RN FR' and labels['cl-rn'] == 'RN CL'
+    assert labels['de-afd'] == 'AfD'
     assert len(set(labels.values())) == len(labels)
 
 
@@ -110,6 +130,8 @@ def test_groupings_are_the_real_memberships():
     assert len(groups['g20']) == 19 and 'TW' not in groups['g20'] and 'SA' in groups['g20']
     assert 'TW' not in groups['brics']
     assert len(groups['full-democracies']) == 26 and {'TW', 'UY', 'MU', 'JP'} <= groups['full-democracies']
+    assert len(groups['oecd']) == 38 and {'BE', 'CL', 'CO', 'IL', 'PL', 'US', 'TR'} <= groups['oecd']
+    assert not groups['oecd'] & {'TW', 'CN', 'RU', 'BR', 'IN', 'SA', 'ZA', 'ID', 'AR', 'MU', 'UY'}
     assert not groups['full-democracies'] & {'US', 'IT', 'SA', 'CN', 'RU'}
     in_a_group = set().union(*groups.values())
     assert in_a_group == {c['code'] for c in MODEL['countries']}
@@ -128,8 +150,7 @@ def test_pca_sign_rule_keeps_axes_from_flipping():
 def test_adding_a_party_needs_only_a_new_row():
     inputs = fresh_inputs()
     row = dict(inputs['parties'][0], id='us-test', abbrev='TST', name_en='Test Party', name_es='Partido de Prueba',
-               economics='50', social='50', civil_liberties='50', internationalism='50', climate='50',
-               logo='', logo_source='')
+               logo='', logo_source='', **{q: '3' for q in bm.ANSWERS})
     inputs['parties'].append(row)
     inputs['config']['clustering'].update(reference_draws=5, bootstrap_draws=5)
     model, warnings = bm.build(inputs)
@@ -150,7 +171,7 @@ def test_new_grouping_reaches_the_model():
 
 def test_a_group_nobody_labelled_gets_an_automatic_name_and_a_warning():
     inputs = fresh_inputs()
-    inputs['labels'] = [r for r in inputs['labels'] if r['label_en'] != 'Liberal internationalist']
+    inputs['labels'] = [r for r in inputs['labels'] if r['label_en'] != 'Internationalist centre']
     inputs['config']['clustering'].update(reference_draws=5, bootstrap_draws=5)
     model, warnings = bm.build(inputs)
     unnamed = [c for m in model['clusters'] for c in m['children'] if c['auto']]
@@ -159,14 +180,14 @@ def test_a_group_nobody_labelled_gets_an_automatic_name_and_a_warning():
 
 
 @pytest.mark.parametrize('mutate, message', [
-    (lambda i: i['parties'][0].update(economics='120'), 'outside 0-100'),
-    (lambda i: i['parties'][0].update(social='high'), 'not a number'),
+    (lambda i: i['parties'][0].update(q01='7'), 'outside 1-5'),
+    (lambda i: i['parties'][0].update(q05='high'), 'not a number'),
     (lambda i: i['parties'][1].update(id=i['parties'][0]['id']), 'already used'),
     (lambda i: i['parties'][0].update(country_code='XX'), 'not in data/countries.csv'),
     (lambda i: i['parties'][0].update(name_es=' '), 'name_es is empty'),
     (lambda i: i['groupings'][0].update(countries='US;XX'), "unknown country 'XX'"),
     (lambda i: i['labels'][0].update(anchors='no-such-party'), 'not a party id'),
-    (lambda i: i['questions']['questions'].pop(), '20 statements'),
+    (lambda i: i['questions']['questions'].pop(), '25 statements'),
 ])
 def test_bad_data_stops_the_build_and_names_the_problem(mutate, message):
     inputs = fresh_inputs()
@@ -185,13 +206,15 @@ def independent_expected(answers):
         total = 0
         for q, a in zip(qs, answers):
             if q['dim'] == dim:
-                total += a if q['sign'] > 0 else 6 - a
-        scores.append(6.25 * (total - 4))
+                total += q['sign'] * (a - 3)
+        scores.append(50 + 5 * total)
     u = np.array(scores)
-    sim = {p['id']: float(100 - np.sqrt(((u - np.array(p['scores'])) ** 2).mean())) for p in MODEL['parties']}
-    main = min(MODEL['clusters'], key=lambda c: ((u - np.array(c['centroid'])) ** 2).sum())
-    sub = min(main['children'], key=lambda c: ((u - np.array(c['centroid'])) ** 2).sum()) if main['children'] else None
-    leaf = min(sub['children'], key=lambda c: ((u - np.array(c['centroid'])) ** 2).sum()) if sub and sub['children'] else None
+    v = np.array(answers, dtype=float)
+    distance = lambda g: 25 * np.sqrt(((v - np.array(g['answers'])) ** 2).mean())
+    sim = {p['id']: float(100 - distance(p)) for p in MODEL['parties']}
+    main = min(MODEL['clusters'], key=distance)
+    sub = min(main['children'], key=distance) if main['children'] else None
+    leaf = min(sub['children'], key=distance) if sub and sub['children'] else None
     mean = np.array(MODEL['pca']['mean'])
     comps = np.array(MODEL['pca']['components'])
     pc = comps[:2] @ (u - mean)
@@ -202,8 +225,8 @@ def independent_expected(answers):
 
 def test_write_golden_file_for_the_browser_tests():
     rng = np.random.default_rng(2026)
-    answers = [[3] * 20, [4, 2] * 10, [2, 4] * 10]
-    answers += [rng.integers(1, 6, 20).tolist() for _ in range(5)]
+    answers = [[3] * 25, ([4, 2] * 13)[:25], ([2, 4] * 13)[:25]]
+    answers += [rng.integers(1, 6, 25).tolist() for _ in range(5)]
     cases = [independent_expected(a) for a in answers]
     out = ROOT / 'tests' / 'golden.json'
     out.write_text(json.dumps(dict(cases=cases), indent=0) + '\n', encoding='utf-8', newline='\n')

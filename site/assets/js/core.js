@@ -1,24 +1,31 @@
 // Pure model logic: no DOM, no storage. Everything here is covered by tests/core.test.mjs.
 
-/** Scoring from the questionnaire: recode reverse items as 6 - r, then 6.25 * (sum - 4). Unrounded. */
+/** Scoring from the questionnaire: recode reverse items as 6 - r, then rescale each dimension's sum to 0-100. Unrounded. */
 export function scoreAnswers(answers, questions, dimensions) {
   return dimensions.map((dim) => {
     let sum = 0;
+    let n = 0;
     questions.forEach((q, i) => {
-      if (q.dim === dim.id) sum += q.sign > 0 ? answers[i] : 6 - answers[i];
+      if (q.dim === dim.id) {
+        sum += q.sign > 0 ? answers[i] : 6 - answers[i];
+        n++;
+      }
     });
-    return 6.25 * (sum - 4);
+    return (100 * (sum - n)) / (4 * n);
   });
 }
 
-/** Root-mean-square difference across the five dimensions, equal weights. */
+/** Root-mean-square difference, equal weights. */
 export function rmsd(a, b) {
   let s = 0;
   for (let i = 0; i < a.length; i++) s += (a[i] - b[i]) ** 2;
   return Math.sqrt(s / a.length);
 }
 
-export const similarity = (a, b) => 100 - rmsd(a, b);
+/** Distance between two sets of 1-5 answers, on a 0-100 scale. Every question weighs the same. */
+export const answerDistance = (a, b) => 25 * rmsd(a, b);
+
+export const similarity = (a, b) => Math.max(0, 100 - answerDistance(a, b));
 
 /** Project a five-dimensional position with the fitted PCA. */
 export function project(v, pca, n = 2) {
@@ -39,14 +46,14 @@ export const contributions = (v, pca, comp) => pca.components[comp].map((w, i) =
 /** Nearest main cluster, then nearest subgroup inside it, then nearest current inside that. Same five-dimensional RMSD throughout. */
 export function assign(v, model) {
   const mains = model.clusters
-    .map((c) => ({ cluster: c, distance: rmsd(v, c.centroid) }))
+    .map((c) => ({ cluster: c, distance: answerDistance(v, c.answers) }))
     .sort((x, y) => x.distance - y.distance);
   const main = mains[0].cluster;
   const subs = main.children
-    .map((c) => ({ cluster: c, distance: rmsd(v, c.centroid) }))
+    .map((c) => ({ cluster: c, distance: answerDistance(v, c.answers) }))
     .sort((x, y) => x.distance - y.distance);
   const leaves = (subs[0]?.cluster.children ?? [])
-    .map((c) => ({ cluster: c, distance: rmsd(v, c.centroid) }))
+    .map((c) => ({ cluster: c, distance: answerDistance(v, c.answers) }))
     .sort((x, y) => x.distance - y.distance);
   return {
     main,
@@ -72,7 +79,7 @@ export const finestGroupOf = (party, model) => allGroups(model).find((g) => g.id
 /** All parties, closest first. Ties break on id so the order never flickers between renders. */
 export function rankParties(v, parties) {
   return parties
-    .map((party) => ({ party, score: similarity(v, party.scores) }))
+    .map((party) => ({ party, score: similarity(v, party.answers) }))
     .sort((x, y) => y.score - x.score || (x.party.id < y.party.id ? -1 : 1));
 }
 

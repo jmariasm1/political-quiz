@@ -6,7 +6,7 @@ Run:  python pipeline/build_model.py
 The model has three clustering levels, all chosen by mean silhouette with no number of
 clusters imposed:
 
-  1. Main clusters: k-means on all parties, k chosen on the grid 2..k_max.
+  1. Main clusters: k-means on all parties' 25 answers, k chosen on the grid 2..k_max.
   2. Subgroups: k-means again inside each main cluster, on the same 5D scale. Solutions
      with a one-party group are rejected, and a cluster stays whole when its best
      silhouette is under `min_split_silhouette` (0.25, the conventional line below which
@@ -21,7 +21,8 @@ only selection rule:
     may be slices of a continuum.
   - Bootstrap stability: Hennig's cluster-wise Jaccard, one value per subgroup or current.
 
-PCA is fitted once on all parties and only ever draws the map. It never assigns anyone.
+PCA is fitted once on the parties' five dimension scores and only ever draws the map. It
+never assigns anyone.
 """
 from __future__ import annotations
 
@@ -42,6 +43,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / 'data'
 SITE = ROOT / 'site'
 DIMS = ['economics', 'social', 'civil_liberties', 'internationalism', 'climate']
+ANSWERS = [f'q{i:02d}' for i in range(1, 26)]
 
 
 class DataError(Exception):
@@ -78,13 +80,13 @@ def validate(parties, countries, groupings, labels, questions, config) -> None:
         for field in ('abbrev', 'name_en', 'name_es'):
             if not p[field].strip():
                 raise DataError(f'{where}: {field} is empty')
-        for d in DIMS:
+        for q in ANSWERS:
             try:
-                value = float(p[d])
+                value = float(p[q])
             except ValueError:
-                raise DataError(f"{where}: {d} = '{p[d]}' is not a number") from None
-            if not 0 <= value <= 100:
-                raise DataError(f'{where}: {d} = {value} is outside 0-100')
+                raise DataError(f"{where}: {q} = '{p[q]}' is not a number") from None
+            if not 1 <= value <= 5:
+                raise DataError(f'{where}: {q} = {value} is outside 1-5')
     for g in groupings:
         for code in g['countries'].split(';'):
             if code not in codes:
@@ -94,8 +96,8 @@ def validate(parties, countries, groupings, labels, questions, config) -> None:
             if anchor not in ids:
                 raise DataError(f"data/cluster_labels.csv: anchor '{anchor}' is not a party id")
     qs = questions['questions']
-    if len(qs) != 20 or {q['dim'] for q in qs} != set(DIMS):
-        raise DataError('data/questions.json: the questionnaire must keep 20 statements on 5 dimensions')
+    if len(qs) != len(ANSWERS) or any(sum(q['dim'] == d for q in qs) != 5 for d in DIMS):
+        raise DataError('data/questions.json: the questionnaire must keep 25 statements, 5 on each of 5 dimensions')
     if [d['id'] for d in config['dimensions']] != DIMS:
         raise DataError('data/config.json: dimensions must stay in the original order')
 
@@ -195,32 +197,48 @@ def r(values, digits=3):
     return round(float(values), digits)
 
 
+def axis_scores(answers: np.ndarray, questions: list[dict]) -> np.ndarray:
+    """Recode reverse items as 6 - r, then rescale each dimension's sum to 0-100."""
+    out = []
+    for d in DIMS:
+        idx = [i for i, q in enumerate(questions) if q['dim'] == d]
+        signs = np.array([questions[i]['sign'] for i in idx])
+        recoded = np.where(signs > 0, answers[:, idx], 6 - answers[:, idx])
+        out.append(100 * (recoded.sum(1) - len(idx)) / (4 * len(idx)))
+    return np.array(out).T
+
+
 def build(inputs: dict) -> tuple[dict, list[str]]:
     cfg = inputs['config']
     params = cfg['clustering']
     seed, k_max, min_size = params['seed'], params['k_max'], params['min_cluster_size']
     parties = inputs['parties']
-    X = np.array([[float(p[d]) for d in DIMS] for p in parties])
+    questions = inputs['questions']['questions']
+    F = np.array([[float(p[q]) for q in ANSWERS] for p in parties])
+    S = axis_scores(F, questions)
+    # Groups are found on the answers themselves, in the same units as similarity: every question weighs the same.
+    X = (F - 1) * 25
     ids = [p['id'] for p in parties]
-    overall = X.mean(0)
+    overall = S.mean(0)
     warnings: list[str] = []
 
-    pca = fit_pca(X)
+    pca = fit_pca(S)
     project = lambda v: (np.asarray(v) - pca['mean']) @ pca['components'].T
-    pcs = project(X)
+    pcs = project(S)
 
     # Level 1. These n_init values are the ones behind the original published solution.
     top_grid = silhouette_grid(X, k_max, seed, 60, 1)
     top_best = best_of(top_grid)
     top_model = fit_kmeans(X, top_best['k'], seed, 100)
     # Stable ids: C1 is the main cluster furthest along PC1.
-    top_order = np.argsort(-project(top_model.cluster_centers_)[:, 0])
+    top_order = np.argsort([-pcs[top_model.labels_ == k, 0].mean() for k in range(top_best['k'])])
     main_of = {int(old): new for new, old in enumerate(top_order)}
     main_labels = np.array([main_of[int(v)] for v in top_model.labels_])
     top_sil = silhouette_samples(X, main_labels)
 
-    def split_group(Y):
+    def split_group(idx):
         """One step down the hierarchy: the silhouette rule applied to one group's parties."""
+        Y = X[idx]
         grid = silhouette_grid(Y, k_max, seed, 100, min_size) if len(Y) >= params['min_parent_size'] else []
         best = best_of(grid)
         split = best is not None and best['silhouette'] >= params['min_split_silhouette']
@@ -231,7 +249,7 @@ def build(inputs: dict) -> tuple[dict, list[str]]:
             return diag, None, None, None
         model = fit_kmeans(Y, best['k'], seed, 200)
         # Stable ids: within a group, the first child is the one furthest along PC1.
-        order = np.argsort(-project(model.cluster_centers_)[:, 0])
+        order = np.argsort([-pcs[idx[model.labels_ == k], 0].mean() for k in range(best['k'])])
         remap = {int(old): new for new, old in enumerate(order)}
         local = np.array([remap[int(v)] for v in model.labels_])
         jaccard = bootstrap_jaccard(Y, local, params['bootstrap_draws'], seed)
@@ -241,9 +259,9 @@ def build(inputs: dict) -> tuple[dict, list[str]]:
         return diag, local, silhouette_samples(Y, local), jaccard
 
     def group_record(gid, mem, level, stability, **extra):
-        centroid = X[mem].mean(0)
+        centroid = S[mem].mean(0)
         info = resolve_label({ids[i] for i in mem}, level, inputs['labels'], centroid, overall, cfg, gid, warnings)
-        return dict(id=gid, n=len(mem), centroid=r(centroid, 2), pc=r(project(centroid)[:2]),
+        return dict(id=gid, n=len(mem), centroid=r(centroid, 2), answers=r(F[mem].mean(0), 3), pc=r(project(centroid)[:2]),
                     members=[ids[i] for i in mem], stability=stability, **extra, **info)
 
     clusters, sub_diagnostics, leaf_diagnostics = [], {}, {}
@@ -254,7 +272,7 @@ def build(inputs: dict) -> tuple[dict, list[str]]:
     for m in range(top_best['k']):
         cid = f'C{m + 1}'
         idx = np.where(main_labels == m)[0]
-        diag, local, samples, jaccard = split_group(X[idx])
+        diag, local, samples, jaccard = split_group(idx)
         children = []
         if local is not None:
             sub_sil[idx] = samples
@@ -262,7 +280,7 @@ def build(inputs: dict) -> tuple[dict, list[str]]:
                 sid = f'{cid}{string.ascii_lowercase[s]}'
                 mem = idx[local == s]
                 sub_labels[mem] = sid
-                leaf_diag, leaf_local, leaf_samples, leaf_jaccard = split_group(X[mem])
+                leaf_diag, leaf_local, leaf_samples, leaf_jaccard = split_group(mem)
                 leaf_diagnostics[sid] = leaf_diag
                 currents = []
                 if leaf_local is not None:
@@ -275,9 +293,9 @@ def build(inputs: dict) -> tuple[dict, list[str]]:
                                                      silhouette=r(leaf_sil[leaf_mem].mean())))
                 children.append(group_record(sid, mem, 'sub', r(jaccard[s]), parent=cid,
                                              silhouette=r(sub_sil[mem].mean()), children=currents))
-        centroid = X[idx].mean(0)
+        centroid = S[idx].mean(0)
         info = resolve_label({ids[i] for i in idx}, 'main', inputs['labels'], centroid, overall, cfg, cid, warnings)
-        clusters.append(dict(id=cid, n=len(idx), centroid=r(centroid, 2), pc=r(project(centroid)[:2]),
+        clusters.append(dict(id=cid, n=len(idx), centroid=r(centroid, 2), answers=r(F[idx].mean(0), 3), pc=r(project(centroid)[:2]),
                              members=[ids[i] for i in idx], silhouette=r(top_sil[idx].mean()),
                              children=children, **info))
         sub_diagnostics[cid] = diag
@@ -292,8 +310,11 @@ def build(inputs: dict) -> tuple[dict, list[str]]:
     # A short hash of the inputs. Saved results remember it so the site can say when the
     # party data have changed since a result was taken.
     digest = hashlib.sha256()
-    for name in ('parties.csv', 'groupings.csv', 'cluster_labels.csv', 'config.json'):
+    for name in ('parties.csv', 'groupings.csv', 'cluster_labels.csv', 'config.json', 'questions.json'):
         digest.update((DATA / name).read_bytes().replace(b'\r\n', b'\n'))
+    # Numbered in the order the quiz shows them, each dimension's statements together.
+    order = [q['id'] for d in DIMS for q in questions if q['dim'] == d]
+    numbered = [dict(q, no=order.index(q['id']) + 1) for q in questions]
     reviewed = sorted(p['last_reviewed'] for p in parties if p.get('last_reviewed'))
 
     abbrev_counts = Counter(p['abbrev'] for p in parties)
@@ -306,7 +327,7 @@ def build(inputs: dict) -> tuple[dict, list[str]]:
         flagAspect=flag_aspects(parties, inputs['countries']),
         agreement={k: v for k, v in cfg['agreement'].items() if not k.startswith('_')},
         scale=inputs['questions']['scale'],
-        questions=inputs['questions']['questions'],
+        questions=numbered,
         countries=[dict(code=c['code'], name=dict(en=c['name_en'], es=c['name_es']), flag=c['flag'])
                    for c in inputs['countries']],
         groupings=[dict(id=g['id'], name=dict(en=g['name_en'], es=g['name_es']), countries=g['countries'].split(';'))
@@ -317,7 +338,7 @@ def build(inputs: dict) -> tuple[dict, list[str]]:
                       label=p['abbrev'] if abbrev_counts[p['abbrev']] == 1 else f"{p['abbrev']} {p['country_code']}",
                       flag=p['flag'] or next(c['flag'] for c in inputs['countries'] if c['code'] == p['country_code']),
                       abbrev=p['abbrev'], name=dict(en=p['name_en'], es=p['name_es']),
-                      scores=[float(p[d]) for d in DIMS], pc=r(pcs[i][:2]),
+                      scores=r(S[i], 3), answers=r(F[i], 3), pc=r(pcs[i][:2]),
                       cluster=f'C{main_labels[i] + 1}', sub=sub_labels[i], leaf=leaf_labels[i],
                       silhouette=r(top_sil[i]), subSilhouette=r(sub_sil[i]), leafSilhouette=r(leaf_sil[i]),
                       logo=p['logo'] if p['logo'] and (SITE / 'assets' / 'logos' / p['logo']).is_file() else None,
@@ -367,12 +388,12 @@ def flag_aspects(parties: list[dict], countries: list[dict]) -> dict:
 
 PAGE_TEXT = {
     'en': dict(
-        description='Answer 20 statements and see where you stand among {parties} political parties in the G20 and the world’s full democracies: '
+        description='Answer 25 statements and see where you stand among {parties} political parties in the G20, the OECD and the world’s full democracies: '
                     'your five-dimensional profile, tier list, party map and head-to-head comparisons.',
         noscript='This site needs JavaScript to score the quiz in your browser.',
         og_locale='en_US'),
     'es': dict(
-        description='Responde 20 afirmaciones y descubre dónde te ubicas entre {parties} partidos políticos del G20 y las democracias plenas del mundo: '
+        description='Responde 25 afirmaciones y descubre dónde te ubicas entre {parties} partidos políticos del G20, la OCDE y las democracias plenas del mundo: '
                     'tu perfil en cinco dimensiones, tu tier list, el mapa de partidos y comparaciones directas.',
         noscript='Este sitio necesita JavaScript para calcular el cuestionario en tu navegador.',
         og_locale='es_LA'),

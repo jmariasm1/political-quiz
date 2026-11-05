@@ -9,7 +9,7 @@ export function methodView(root, app) {
   const params = d.params;
 
   const qList = (dim, sign) =>
-    model.questions.filter((q) => q.dim === dim && q.sign === sign).map((q) => `Q${q.id}`).join(', ');
+    model.questions.filter((q) => q.dim === dim && q.sign === sign).map((q) => `Q${q.no}`).join(', ');
 
   const checkBlock = (group, dd, level) => {
     if (dd.selected_k <= 1) return `<p>${esc(t(`map.whole${level}`, { name: group.label[lang] }))}</p>`;

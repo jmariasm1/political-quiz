@@ -41,9 +41,10 @@ const app = {
     const scores = scoreAnswers(result.answers, this.model.questions, this.model.dimensions);
     return {
       result,
+      answers: result.answers,
       scores,
-      assign: assign(scores, this.model),
-      ranked: rankParties(scores, this.model.parties),
+      assign: assign(result.answers, this.model),
+      ranked: rankParties(result.answers, this.model.parties),
       pc: project(scores, this.model.pca),
     };
   },
@@ -193,7 +194,12 @@ function route() {
   const root = document.createElement('div');
   root.className = `view view-${name || 'home'}`;
   main.replaceChildren(root);
-  if (name === 'quiz' && params.new) history.replaceState(null, '', '#/quiz');
+  if (name === 'quiz' && params.finish) {
+    // A result saved before the last five statements were added: keep its answers and ask for the rest.
+    const old = store.legacy().find((r) => r.id === params.finish);
+    if (old) store.saveDraft({ answers: [...old.answers], section: 0, finishes: old.id });
+  }
+  if (name === 'quiz' && (params.new || params.finish)) history.replaceState(null, '', '#/quiz');
   cleanup = view(root, app, params) ?? null;
   refreshNav();
   updateLanguageLink();

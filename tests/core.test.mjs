@@ -14,7 +14,7 @@ import { STRINGS, createT } from '../site/assets/js/i18n.js';
 const model = JSON.parse(readFileSync(new URL('../site/data/model.json', import.meta.url), 'utf8'));
 const golden = JSON.parse(readFileSync(new URL('./golden.json', import.meta.url), 'utf8'));
 // No usable logo could be found for these yet, so they show their abbreviation instead.
-const NO_LOGO_FOUND = ['mu-fmp'];
+const NO_LOGO_FOUND = ['mu-fmp', 'pl-centrum', 'si-dem'];
 const close = (a, b, tol = 1e-6) => assert.ok(Math.abs(a - b) <= tol, `${a} is not within ${tol} of ${b}`);
 
 test('every answer pattern scores like the questionnaire formula', () => {
@@ -24,9 +24,14 @@ test('every answer pattern scores like the questionnaire formula', () => {
   }
 });
 
-test('all-agree and all-disagree cancel out to the midpoint because half the items are reversed', () => {
-  assert.deepEqual(scoreAnswers(Array(20).fill(5), model.questions, model.dimensions), [50, 50, 50, 50, 50]);
-  assert.deepEqual(scoreAnswers(Array(20).fill(1), model.questions, model.dimensions), [50, 50, 50, 50, 50]);
+test('neutral answers land on the midpoint of every dimension', () => {
+  assert.deepEqual(scoreAnswers(Array(25).fill(3), model.questions, model.dimensions), [50, 50, 50, 50, 50]);
+});
+
+test('similarity is 100 minus 25 times the root-mean-square difference between answers', () => {
+  assert.equal(similarity(Array(25).fill(3), Array(25).fill(3)), 100);
+  assert.equal(similarity(Array(25).fill(1), Array(25).fill(5)), 0);
+  assert.equal(similarity(Array(25).fill(3), Array(25).fill(4)), 75);
 });
 
 test('the score range is exactly 0 to 100', () => {
@@ -38,25 +43,25 @@ test('the score range is exactly 0 to 100', () => {
 
 test('similarity matches numpy for every party', () => {
   for (const c of golden.cases) {
-    for (const p of model.parties) close(similarity(c.scores, p.scores), c.similarity[p.id]);
+    for (const p of model.parties) close(similarity(c.answers, p.answers), c.similarity[p.id]);
   }
 });
 
 test('rankings are sorted and stable', () => {
-  const ranked = rankParties(golden.cases[0].scores, model.parties);
+  const ranked = rankParties(golden.cases[0].answers, model.parties);
   assert.equal(ranked.length, model.parties.length);
   for (let i = 1; i < ranked.length; i++) assert.ok(ranked[i - 1].score >= ranked[i].score);
-  assert.deepEqual(ranked.map((r) => r.party.id), rankParties(golden.cases[0].scores, [...model.parties].reverse()).map((r) => r.party.id));
+  assert.deepEqual(ranked.map((r) => r.party.id), rankParties(golden.cases[0].answers, [...model.parties].reverse()).map((r) => r.party.id));
 });
 
 test('placement matches numpy: nearest main cluster, then subgroup inside it, then current inside that', () => {
   for (const c of golden.cases) {
-    const a = assign(c.scores, model);
+    const a = assign(c.answers, model);
     assert.equal(a.main.id, c.main);
     assert.equal(a.sub?.id ?? null, c.sub);
     assert.equal(a.leaf?.id ?? null, c.leaf);
-    assert.ok(a.leaf.parent === a.sub.id && a.sub.parent === a.main.id);
-    assert.equal(nearestGroup(a).id, c.leaf);
+    assert.ok(a.sub.parent === a.main.id && (!a.leaf || a.leaf.parent === a.sub.id));
+    assert.equal(nearestGroup(a).id, c.leaf ?? c.sub);
   }
 });
 
@@ -114,7 +119,7 @@ function bruteForceGap(scores, nTiers) {
 
 test('spread tiers: inner widths are 5 or 10, every party has a tier, and no cutoffs give a smaller gap', () => {
   for (const c of golden.cases) {
-    const scores = rankParties(c.scores, model.parties).map((r) => r.score);
+    const scores = rankParties(c.answers, model.parties).map((r) => r.score);
     const spread = spreadTiers(scores, model.tiers);
     const mins = spread.tiers.map((t) => t.min);
     assert.equal(spread.tiers.length, model.tiers.length);
@@ -130,7 +135,7 @@ test('spread tiers: inner widths are 5 or 10, every party has a tier, and no cut
 });
 
 test('spread tiers keep the highest scores on top and the tier colours in place', () => {
-  const scores = rankParties(golden.cases[0].scores, model.parties).map((r) => r.score);
+  const scores = rankParties(golden.cases[0].answers, model.parties).map((r) => r.score);
   const spread = spreadTiers(scores, model.tiers);
   assert.equal(fixedTier(Math.max(...scores), spread.tiers).id, 'S');
   assert.equal(fixedTier(Math.min(...scores), spread.tiers).id, 'F');
@@ -199,11 +204,11 @@ test('convex hull handles pairs, collinear points and ordinary shapes', () => {
   assert.equal(convexHull([[0, 0], [2, 0], [2, 2], [0, 2], [1, 1]]).length, 4);
 });
 
-test('every group at every level is listed once, and each party sits in one current', () => {
+test('every group at every level is listed once, and each party sits in one group at each level', () => {
   const ids = allGroups(model).map((g) => g.id);
   assert.equal(new Set(ids).size, ids.length);
   for (const p of model.parties) {
-    assert.ok(p.leaf.startsWith(p.sub) && p.sub.startsWith(p.cluster), p.id);
+    assert.ok((p.leaf ?? p.sub).startsWith(p.sub) && p.sub.startsWith(p.cluster), p.id);
   }
 });
 
@@ -222,7 +227,7 @@ test('both languages define the same strings with the same placeholders', () => 
   assert.deepEqual(keys(STRINGS.en), keys(STRINGS.es));
   const sample = {
     names: 'x', n: 2, total: 3, a: 'A', b: 'B', d: 1, v: 1, k: 1, s: 1, p: 1, id: 'C1', date: 'x', name: 'x', party: 'x', country: 'x',
-    score: 1, cluster: 'x', tier: 'S', pole: 'x', poleA: 'x', poleB: 'x', who: 'x', pos: 'x', neg: 'x', x: 1, y: 1, kmax: 12, min: 1, overall: 1,
+    score: 1, cluster: 'x', tier: 'S', pole: 'x', poleA: 'x', poleB: 'x', who: 'x', pos: 'x', neg: 'x', x: 1, y: 1, kmax: 12, min: 1, overall: 1, total: 25,
     draws: 1, boot: 1, version: 'x', parties: 1, countries: 1, scope: 'x', phrase: 'x', dim: 'x', top: 'x', topCountry: 'x', topScore: 1, far: 'x',
     farCountry: 'x', farScore: 1, group: 'x', leftRight: 'x', upDown: 'x', near: 'x',
   };
@@ -257,12 +262,11 @@ test('number formats follow the language', () => {
   assert.equal(createT('en').signed(-0.37, 2), '−0.37');
 });
 
-test('the questionnaire is intact: 20 statements, 4 per dimension, in both languages', () => {
-  assert.equal(model.questions.length, 20);
+test('the questionnaire has 25 statements, 5 per dimension, in both languages', () => {
+  assert.equal(model.questions.length, 25);
   for (const d of model.dimensions) {
     const qs = model.questions.filter((q) => q.dim === d.id);
-    assert.equal(qs.length, 4);
-    assert.equal(qs.filter((q) => q.sign > 0).length, 2);
+    assert.equal(qs.length, 5);
   }
   assert.ok(model.questions.every((q) => q.en && q.es));
   assert.equal(model.scale.en.length, 5);

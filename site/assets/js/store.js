@@ -4,6 +4,8 @@
 
 const KEY = 'gic.v1';
 const MAX_RESULTS = 50;
+const QUESTIONS = 25;
+const LEGACY_QUESTIONS = 20; // results saved before the last five statements were added
 const EMPTY = () => ({ results: [], activeId: null, draft: null, scope: 'all' });
 
 let memory = null; // used when storage is blocked, so the current visit still works
@@ -11,7 +13,7 @@ let persistent = true;
 
 function isValidResult(r) {
   return (
-    r && typeof r.id === 'string' && typeof r.at === 'string' && Array.isArray(r.answers) && r.answers.length === 20 &&
+    r && typeof r.id === 'string' && typeof r.at === 'string' && Array.isArray(r.answers) && (r.answers.length === QUESTIONS || r.answers.length === LEGACY_QUESTIONS) &&
     r.answers.every((a) => Number.isInteger(a) && a >= 1 && a <= 5)
   );
 }
@@ -57,12 +59,14 @@ export const store = {
     read();
     return persistent;
   },
-  results: () => read().results,
+  results: () => read().results.filter((r) => r.answers.length === QUESTIONS),
+  /** Results that still need the five newer statements. They can't be scored until those are answered. */
+  legacy: () => read().results.filter((r) => r.answers.length === LEGACY_QUESTIONS),
   active() {
-    const { results, activeId } = read();
-    return results.find((r) => r.id === activeId) ?? results[results.length - 1] ?? null;
+    const results = store.results();
+    return results.find((r) => r.id === read().activeId) ?? results[results.length - 1] ?? null;
   },
-  get: (id) => read().results.find((r) => r.id === id) ?? null,
+  get: (id) => store.results().find((r) => r.id === id) ?? null,
   setActive: (id) => update((s) => void (s.activeId = id)),
   addResult(answers, version) {
     const result = { id: `r${Date.now().toString(36)}`, at: new Date().toISOString(), answers: [...answers], version };

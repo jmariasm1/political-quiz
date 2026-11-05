@@ -1,69 +1,196 @@
 {
   "_comment": "The questionnaire is fixed: 20 statements, 5 dimensions, 4 per dimension. English text is verbatim from the original questionnaire. 'sign' is +1 for direct and -1 for reverse-coded statements. Do not reorder.",
   "scale": {
-    "en": ["Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree"],
-    "es": ["Muy en desacuerdo", "En desacuerdo", "Neutral", "De acuerdo", "Muy de acuerdo"]
+    "en": [
+      "Strongly disagree",
+      "Disagree",
+      "Neutral",
+      "Agree",
+      "Strongly agree"
+    ],
+    "es": [
+      "Muy en desacuerdo",
+      "En desacuerdo",
+      "Neutral",
+      "De acuerdo",
+      "Muy de acuerdo"
+    ]
   },
   "questions": [
-    {"id": 1, "dim": "economics", "sign": -1,
-     "en": "Higher taxes on high incomes are justified to fund stronger public services.",
-     "es": "Los impuestos más altos a los ingresos altos se justifican para financiar servicios públicos más sólidos."},
-    {"id": 2, "dim": "economics", "sign": 1,
-     "en": "Businesses generally allocate resources more efficiently than governments.",
-     "es": "Por lo general, las empresas asignan los recursos de manera más eficiente que los gobiernos."},
-    {"id": 3, "dim": "economics", "sign": -1,
-     "en": "Healthcare and education should be predominantly publicly funded.",
-     "es": "La salud y la educación deberían financiarse predominantemente con recursos públicos."},
-    {"id": 4, "dim": "economics", "sign": 1,
-     "en": "Economic regulations should be reduced even if inequality increases.",
-     "es": "Las regulaciones económicas deberían reducirse aunque aumente la desigualdad."},
-    {"id": 5, "dim": "social", "sign": 1,
-     "en": "Same-sex couples should enjoy the same marriage rights as other couples.",
-     "es": "Las parejas del mismo sexo deberían gozar de los mismos derechos matrimoniales que las demás parejas."},
-    {"id": 6, "dim": "social", "sign": -1,
-     "en": "Government should actively defend traditional religious and family norms.",
-     "es": "El gobierno debería defender activamente las normas religiosas y familiares tradicionales."},
-    {"id": 7, "dim": "social", "sign": 1,
-     "en": "Access to abortion should generally be protected as an individual choice.",
-     "es": "El acceso al aborto debería protegerse, en general, como una decisión individual."},
-    {"id": 8, "dim": "social", "sign": -1,
-     "en": "Schools should emphasize traditional values rather than evolving social norms.",
-     "es": "Las escuelas deberían enfatizar los valores tradicionales en lugar de las normas sociales en evolución."},
-    {"id": 9, "dim": "civil_liberties", "sign": 1,
-     "en": "Independent courts and news media should be able to challenge the government without interference.",
-     "es": "Los tribunales independientes y los medios de comunicación deberían poder cuestionar al gobierno sin interferencias."},
-    {"id": 10, "dim": "civil_liberties", "sign": -1,
-     "en": "The government should be allowed to restrict political speech to preserve social order.",
-     "es": "Al gobierno se le debería permitir restringir el discurso político para preservar el orden social."},
-    {"id": 11, "dim": "civil_liberties", "sign": 1,
-     "en": "Peaceful demonstrations should remain legal even when they seriously challenge those in power.",
-     "es": "Las manifestaciones pacíficas deberían seguir siendo legales incluso cuando desafíen seriamente a quienes están en el poder."},
-    {"id": 12, "dim": "civil_liberties", "sign": -1,
-     "en": "Extensive government surveillance is acceptable when it improves public security.",
-     "es": "La vigilancia gubernamental extensa es aceptable cuando mejora la seguridad pública."},
-    {"id": 13, "dim": "internationalism", "sign": -1,
-     "en": "International agreements should sometimes constrain domestic policy decisions.",
-     "es": "Los acuerdos internacionales deberían, en ocasiones, limitar las decisiones de política interna."},
-    {"id": 14, "dim": "internationalism", "sign": 1,
-     "en": "Domestic producers should receive preference even when free trade would be cheaper.",
-     "es": "Los productores nacionales deberían recibir preferencia incluso cuando el libre comercio sería más barato."},
-    {"id": 15, "dim": "internationalism", "sign": -1,
-     "en": "Countries should accept binding oversight by international institutions on shared problems.",
-     "es": "Los países deberían aceptar la supervisión vinculante de instituciones internacionales sobre problemas compartidos."},
-    {"id": 16, "dim": "internationalism", "sign": 1,
-     "en": "National sovereignty should generally take priority over multilateral commitments.",
-     "es": "La soberanía nacional debería, en general, tener prioridad sobre los compromisos multilaterales."},
-    {"id": 17, "dim": "climate", "sign": -1,
-     "en": "Governments should accelerate the phaseout of fossil fuels even at substantial short-term cost.",
-     "es": "Los gobiernos deberían acelerar la eliminación de los combustibles fósiles, incluso con un costo sustancial a corto plazo."},
-    {"id": 18, "dim": "climate", "sign": 1,
-     "en": "Environmental regulation should be relaxed when it threatens industrial competitiveness.",
-     "es": "La regulación ambiental debería flexibilizarse cuando amenaza la competitividad industrial."},
-    {"id": 19, "dim": "climate", "sign": -1,
-     "en": "Large public investments in renewable energy and clean transportation are worthwhile.",
-     "es": "Las grandes inversiones públicas en energías renovables y transporte limpio valen la pena."},
-    {"id": 20, "dim": "climate", "sign": 1,
-     "en": "Climate policy should prioritize gradual adaptation rather than stringent emissions reductions.",
-     "es": "La política climática debería priorizar la adaptación gradual en lugar de reducciones estrictas de emisiones."}
+    {
+      "id": 1,
+      "dim": "economics",
+      "sign": -1,
+      "en": "Higher taxes on high incomes are justified to fund stronger public services.",
+      "es": "Los impuestos más altos a los ingresos altos se justifican para financiar servicios públicos más sólidos."
+    },
+    {
+      "id": 2,
+      "dim": "economics",
+      "sign": 1,
+      "en": "Businesses generally allocate resources more efficiently than governments.",
+      "es": "Por lo general, las empresas asignan los recursos de manera más eficiente que los gobiernos."
+    },
+    {
+      "id": 3,
+      "dim": "economics",
+      "sign": -1,
+      "en": "Healthcare and education should be predominantly publicly funded.",
+      "es": "La salud y la educación deberían financiarse predominantemente con recursos públicos."
+    },
+    {
+      "id": 4,
+      "dim": "economics",
+      "sign": 1,
+      "en": "Economic regulations should be reduced even if inequality increases.",
+      "es": "Las regulaciones económicas deberían reducirse aunque aumente la desigualdad."
+    },
+    {
+      "id": 5,
+      "dim": "social",
+      "sign": 1,
+      "en": "Same-sex couples should enjoy the same marriage rights as other couples.",
+      "es": "Las parejas del mismo sexo deberían gozar de los mismos derechos matrimoniales que las demás parejas."
+    },
+    {
+      "id": 6,
+      "dim": "social",
+      "sign": -1,
+      "en": "Government should actively defend traditional religious and family norms.",
+      "es": "El gobierno debería defender activamente las normas religiosas y familiares tradicionales."
+    },
+    {
+      "id": 7,
+      "dim": "social",
+      "sign": 1,
+      "en": "Access to abortion should generally be protected as an individual choice.",
+      "es": "El acceso al aborto debería protegerse, en general, como una decisión individual."
+    },
+    {
+      "id": 8,
+      "dim": "social",
+      "sign": -1,
+      "en": "Schools should emphasize traditional values rather than evolving social norms.",
+      "es": "Las escuelas deberían enfatizar los valores tradicionales en lugar de las normas sociales en evolución."
+    },
+    {
+      "id": 9,
+      "dim": "civil_liberties",
+      "sign": 1,
+      "en": "Independent courts and news media should be able to challenge the government without interference.",
+      "es": "Los tribunales independientes y los medios de comunicación deberían poder cuestionar al gobierno sin interferencias."
+    },
+    {
+      "id": 10,
+      "dim": "civil_liberties",
+      "sign": -1,
+      "en": "The government should be allowed to restrict political speech to preserve social order.",
+      "es": "Al gobierno se le debería permitir restringir el discurso político para preservar el orden social."
+    },
+    {
+      "id": 11,
+      "dim": "civil_liberties",
+      "sign": 1,
+      "en": "Peaceful demonstrations should remain legal even when they seriously challenge those in power.",
+      "es": "Las manifestaciones pacíficas deberían seguir siendo legales incluso cuando desafíen seriamente a quienes están en el poder."
+    },
+    {
+      "id": 12,
+      "dim": "civil_liberties",
+      "sign": -1,
+      "en": "Extensive government surveillance is acceptable when it improves public security.",
+      "es": "La vigilancia gubernamental extensa es aceptable cuando mejora la seguridad pública."
+    },
+    {
+      "id": 13,
+      "dim": "internationalism",
+      "sign": -1,
+      "en": "International agreements should sometimes constrain domestic policy decisions.",
+      "es": "Los acuerdos internacionales deberían, en ocasiones, limitar las decisiones de política interna."
+    },
+    {
+      "id": 14,
+      "dim": "internationalism",
+      "sign": 1,
+      "en": "Domestic producers should receive preference even when free trade would be cheaper.",
+      "es": "Los productores nacionales deberían recibir preferencia incluso cuando el libre comercio sería más barato."
+    },
+    {
+      "id": 15,
+      "dim": "internationalism",
+      "sign": -1,
+      "en": "Countries should accept binding oversight by international institutions on shared problems.",
+      "es": "Los países deberían aceptar la supervisión vinculante de instituciones internacionales sobre problemas compartidos."
+    },
+    {
+      "id": 16,
+      "dim": "internationalism",
+      "sign": 1,
+      "en": "National sovereignty should generally take priority over multilateral commitments.",
+      "es": "La soberanía nacional debería, en general, tener prioridad sobre los compromisos multilaterales."
+    },
+    {
+      "id": 17,
+      "dim": "climate",
+      "sign": -1,
+      "en": "Governments should accelerate the phaseout of fossil fuels even at substantial short-term cost.",
+      "es": "Los gobiernos deberían acelerar la eliminación de los combustibles fósiles, incluso con un costo sustancial a corto plazo."
+    },
+    {
+      "id": 18,
+      "dim": "climate",
+      "sign": 1,
+      "en": "Environmental regulation should be relaxed when it threatens industrial competitiveness.",
+      "es": "La regulación ambiental debería flexibilizarse cuando amenaza la competitividad industrial."
+    },
+    {
+      "id": 19,
+      "dim": "climate",
+      "sign": -1,
+      "en": "Large public investments in renewable energy and clean transportation are worthwhile.",
+      "es": "Las grandes inversiones públicas en energías renovables y transporte limpio valen la pena."
+    },
+    {
+      "id": 20,
+      "dim": "climate",
+      "sign": 1,
+      "en": "Climate policy should prioritize gradual adaptation rather than stringent emissions reductions.",
+      "es": "La política climática debería priorizar la adaptación gradual en lugar de reducciones estrictas de emisiones."
+    },
+    {
+      "id": 21,
+      "dim": "economics",
+      "sign": -1,
+      "en": "The state should own controlling stakes in major energy, transport, and banking enterprises.",
+      "es": "El Estado debería poseer participaciones de control en las grandes empresas de energía, transporte y banca."
+    },
+    {
+      "id": 22,
+      "dim": "social",
+      "sign": 1,
+      "en": "Legal recognition of a person’s gender identity should not require medical diagnosis or approval.",
+      "es": "El reconocimiento legal de la identidad de género de una persona no debería requerir un diagnóstico ni una aprobación médica."
+    },
+    {
+      "id": 23,
+      "dim": "civil_liberties",
+      "sign": 1,
+      "en": "Even during serious security threats, government interception of private communications should require prior authorization from an independent court.",
+      "es": "Incluso durante amenazas graves a la seguridad, la interceptación gubernamental de comunicaciones privadas debería requerir autorización previa de un tribunal independiente."
+    },
+    {
+      "id": 24,
+      "dim": "internationalism",
+      "sign": -1,
+      "en": "Countries should support multilateral sanctions against governments responsible for severe human-rights abuses, even when sanctions impose significant domestic economic costs.",
+      "es": "Los países deberían apoyar sanciones multilaterales contra gobiernos responsables de graves abusos de derechos humanos, incluso cuando esas sanciones impliquen costos económicos internos significativos."
+    },
+    {
+      "id": 25,
+      "dim": "climate",
+      "sign": -1,
+      "en": "Wealthy economies should accept slower economic growth when necessary to reduce resource consumption and meet climate targets.",
+      "es": "Las economías ricas deberían aceptar un crecimiento económico más lento cuando sea necesario para reducir el consumo de recursos y cumplir las metas climáticas."
+    }
   ]
 }

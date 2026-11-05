@@ -25,7 +25,8 @@ const server = http.createServer((req, res) => {
 const base = `http://127.0.0.1:${server.address().port}`;
 const model = JSON.parse(fs.readFileSync(path.join(SITE, 'data', 'model.json'), 'utf8'));
 const subCount = model.clusters.flatMap((c) => c.children).length;
-const leafCount = model.clusters.flatMap((c) => c.children).flatMap((s) => s.children).length;
+// A subgroup that stayed whole stands in for its currents.
+const leafCount = model.clusters.flatMap((c) => c.children).reduce((sum, s) => sum + (s.children.length || 1), 0);
 const inGroup = (id) => model.parties.filter((p) => model.groupings.find((g) => g.id === id).countries.includes(p.country)).length;
 
 const browser = await chromium.launch();
@@ -77,11 +78,11 @@ await check('the quiz will not advance with statements unanswered', async () => 
   // The button is aria-disabled rather than disabled, so a click can guide you to the gap.
   await page.click('[data-next]', { force: true });
   assert.match(await page.textContent('.quiz-section'), /Section 1 \| Economics/);
-  assert.match(await page.textContent('[data-hint]'), /remaining 4 statements/);
+  assert.match(await page.textContent('[data-hint]'), /remaining 5 statements/);
 });
 
-await check('the first section shows four statements on the five-point scale', async () => {
-  assert.equal((await page.$$('fieldset.q')).length, 4);
+await check('the first section shows five statements on the five-point scale', async () => {
+  assert.equal((await page.$$('fieldset.q')).length, 5);
   assert.match(await page.textContent('fieldset.q legend'), /Q01\. Higher taxes on high incomes/);
   assert.equal((await page.$$('fieldset.q:first-of-type input[type=radio]')).length, 5);
 });
@@ -90,7 +91,7 @@ await check('progress survives a reload mid-quiz', async () => {
   await (await page.$('fieldset.q input[value="4"]')).check({ force: true });
   await page.reload();
   await ready(page);
-  assert.match(await page.textContent('.quiz-count'), /1 \/ 20/);
+  assert.match(await page.textContent('.quiz-count'), /1 \/ 25/);
   assert.ok(await page.$eval('fieldset.q input[value="4"]', (i) => i.checked));
 });
 
@@ -103,8 +104,36 @@ await check('finishing the quiz opens one story, starting with a written headlin
   for (const id of ['s-closest', 's-dims', 's-tiers', 's-map', 's-compare', 's-all']) assert.ok(await page.$(`#${id}`), id);
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('gic.v1')));
   assert.equal(stored.results.length, 1);
-  assert.equal(stored.results[0].answers.length, 20);
+  assert.equal(stored.results[0].answers.length, 25);
   assert.equal(stored.draft, null);
+});
+
+await check('a result saved with the old 20 statements asks for the 5 new ones, then replaces itself', async () => {
+  const older = await newPage();
+  await older.addInitScript(() => {
+    if (!localStorage.getItem('gic.v1')) {
+      localStorage.setItem('gic.v1', JSON.stringify({ results: [{ id: 'old1', at: '2026-01-01T00:00:00Z', answers: Array(20).fill(4), version: 'x' }], activeId: 'old1', scope: 'all' }));
+    }
+  });
+  await older.goto(`${base}/en/#/results`);
+  await older.waitForSelector('.empty a[href*="finish=old1"]');
+  await older.goto(`${base}/en/#/`);
+  await older.waitForSelector('.saved a[href*="finish=old1"]');
+  await older.goto(`${base}/en/#/quiz?finish=old1`);
+  await older.waitForSelector('.quiz-section');
+  assert.match(await older.textContent('.quiz-count'), /20 \/ 25/);
+  for (let s = 0; s < 5; s++) {
+    await older.waitForSelector('.quiz-section');
+    assert.equal(await older.$$eval('fieldset.q:not(.is-done)', (f) => f.length), 1, 'only the new statement in each section is unanswered');
+    await (await older.$('fieldset.q:not(.is-done) input[value="2"]')).check({ force: true });
+    await older.click('[data-next]');
+  }
+  await older.waitForSelector('.story-head h1');
+  const stored = await older.evaluate(() => JSON.parse(localStorage.getItem('gic.v1')));
+  assert.equal(stored.results.length, 1);
+  assert.equal(stored.results[0].answers.length, 25);
+  assert.deepEqual(stored.results[0].answers.slice(0, 20), Array(20).fill(4));
+  await older.context().close();
 });
 
 await check('the result is still there after leaving and coming back', async () => {
