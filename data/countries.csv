@@ -1,0 +1,40 @@
+code,name_en,name_es,flag
+US,United States,Estados Unidos,us
+CA,Canada,Canadá,ca
+UK,United Kingdom,Reino Unido,gb
+DE,Germany,Alemania,de
+FR,France,Francia,fr
+IT,Italy,Italia,it
+JP,Japan,Japón,jp
+BR,Brazil,Brasil,br
+RU,Russia,Rusia,ru
+IN,India,India,in
+CN,China,China,cn
+ZA,South Africa,Sudáfrica,za
+AR,Argentina,Argentina,ar
+AU,Australia,Australia,au
+ID,Indonesia,Indonesia,id
+MX,Mexico,México,mx
+SA,Saudi Arabia,Arabia Saudita,sa
+KR,South Korea,Corea del Sur,kr
+TR,Türkiye,Turquía,tr
+AT,Austria,Austria,at
+CR,Costa Rica,Costa Rica,cr
+CZ,Czech Republic,República Checa,cz
+DK,Denmark,Dinamarca,dk
+EE,Estonia,Estonia,ee
+FI,Finland,Finlandia,fi
+GR,Greece,Grecia,gr
+IS,Iceland,Islandia,is
+IE,Ireland,Irlanda,ie
+LU,Luxembourg,Luxemburgo,lu
+MU,Mauritius,Mauricio,mu
+NL,Netherlands,Países Bajos,nl
+NZ,New Zealand,Nueva Zelanda,nz
+NO,Norway,Noruega,no
+PT,Portugal,Portugal,pt
+ES,Spain,España,es
+SE,Sweden,Suecia,se
+CH,Switzerland,Suiza,ch
+TW,Taiwan,Taiwán,tw
+UY,Uruguay,Uruguay,uy

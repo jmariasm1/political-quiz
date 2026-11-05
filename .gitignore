@@ -1,0 +1,12 @@
+node_modules/
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+*.pyc
+
+# Personal quiz results must never enter this public repository.
+*PERSONAL*
+your_20_answers*
+your_ideological_scores*
+Ideology_Questionnaire_Scoring*

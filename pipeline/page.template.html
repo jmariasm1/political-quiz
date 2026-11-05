@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#161616">
+<link rel="canonical" href="{{base}}/{{lang}}/">
+<link rel="alternate" hreflang="en" href="{{base}}/en/">
+<link rel="alternate" hreflang="es" href="{{base}}/es/">
+<link rel="alternate" hreflang="x-default" href="{{base}}/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{title}}">
+<meta property="og:description" content="{{description}}">
+<meta property="og:url" content="{{base}}/{{lang}}/">
+<meta property="og:locale" content="{{og_locale}}">
+<meta property="og:image" content="{{base}}/assets/og-{{lang}}.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="preload" href="../assets/fonts/display-800-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/text-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<script src="../assets/js/theme-init.js"></script>
+<link rel="stylesheet" href="../assets/css/app.css">
+<script type="module" src="../assets/js/app.js"></script>
+</head>
+<body>
+<noscript><p style="padding:24px">{{noscript}}</p></noscript>
+<main id="main"></main>
+</body>
+</html>

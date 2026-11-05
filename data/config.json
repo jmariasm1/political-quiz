@@ -1,0 +1,153 @@
+{
+  "_comment": "Display and model settings. Changing anything here and rebuilding is safe: saved results keep the raw answers and are re-scored against the current model.",
+  "site": {
+    "title": {
+      "en": "Global Ideological Compass",
+      "es": "Brújula Ideológica Global"
+    },
+    "url": "https://jmariasm1.github.io/political-quiz/"
+  },
+  "dimensions": [
+    {
+      "id": "economics",
+      "name": {
+        "en": "Economics",
+        "es": "Economía"
+      },
+      "short": {
+        "en": "Economics",
+        "es": "Economía"
+      },
+      "low": {
+        "en": "Redistribution",
+        "es": "Redistribución"
+      },
+      "high": {
+        "en": "Free markets",
+        "es": "Libre mercado"
+      }
+    },
+    {
+      "id": "social",
+      "name": {
+        "en": "Social values",
+        "es": "Valores sociales"
+      },
+      "short": {
+        "en": "Social",
+        "es": "Social"
+      },
+      "low": {
+        "en": "Traditional",
+        "es": "Tradicional"
+      },
+      "high": {
+        "en": "Progressive",
+        "es": "Progresista"
+      }
+    },
+    {
+      "id": "civil_liberties",
+      "name": {
+        "en": "Civil liberties",
+        "es": "Libertades civiles"
+      },
+      "short": {
+        "en": "Liberties",
+        "es": "Libertades"
+      },
+      "low": {
+        "en": "State control",
+        "es": "Control estatal"
+      },
+      "high": {
+        "en": "Individual liberty",
+        "es": "Libertad individual"
+      }
+    },
+    {
+      "id": "internationalism",
+      "name": {
+        "en": "Internationalism",
+        "es": "Internacionalismo"
+      },
+      "short": {
+        "en": "Global",
+        "es": "Global"
+      },
+      "low": {
+        "en": "Global cooperation",
+        "es": "Cooperación global"
+      },
+      "high": {
+        "en": "Sovereignty first",
+        "es": "Soberanía primero"
+      }
+    },
+    {
+      "id": "climate",
+      "name": {
+        "en": "Climate policy",
+        "es": "Política climática"
+      },
+      "short": {
+        "en": "Climate",
+        "es": "Clima"
+      },
+      "low": {
+        "en": "Rapid green transition",
+        "es": "Transición verde rápida"
+      },
+      "high": {
+        "en": "Gradual transition",
+        "es": "Transición gradual"
+      }
+    }
+  ],
+  "tiers": [
+    {
+      "id": "S",
+      "min": 70,
+      "color": "#ff7b80"
+    },
+    {
+      "id": "A",
+      "min": 65,
+      "color": "#ffac7f"
+    },
+    {
+      "id": "B",
+      "min": 60,
+      "color": "#ffdf80"
+    },
+    {
+      "id": "C",
+      "min": 50,
+      "color": "#e5ed88"
+    },
+    {
+      "id": "D",
+      "min": 45,
+      "color": "#9de9a9"
+    },
+    {
+      "id": "F",
+      "min": 0,
+      "color": "#9ccfff"
+    }
+  ],
+  "agreement": {
+    "_comment": "Gaps on the 0-100 scale used in 'Where they agree and diverge'. Display choice, not part of the model.",
+    "agree_max": 10,
+    "diverge_min": 25
+  },
+  "clustering": {
+    "seed": 41,
+    "k_max": 12,
+    "min_cluster_size": 2,
+    "min_parent_size": 4,
+    "min_split_silhouette": 0.25,
+    "reference_draws": 200,
+    "bootstrap_draws": 300
+  }
+}
